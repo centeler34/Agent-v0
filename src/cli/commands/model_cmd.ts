@@ -18,7 +18,7 @@ const NC = '\x1b[0m';
 function getProviderConfig(provider: 'ollama' | 'lmstudio') {
   const envPath = path.join(process.env.HOME || '~', '.cyplex', '.env');
   let ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-  let lmstudioUrl = process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234';
+  let lmstudioUrl = process.env.LMSTUDIO_BASE_URL || 'http://127.0.0.1:1234';
 
   if (fs.existsSync(envPath)) {
     const content = fs.readFileSync(envPath, 'utf-8');

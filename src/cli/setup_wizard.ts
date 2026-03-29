@@ -266,6 +266,36 @@ async function stepCloudProviders(rl: readline.Interface): Promise<{ keys: Recor
   return { keys, defaultProvider, fallbackProvider };
 }
 
+async function fetchModels(baseUrl: string, provider: 'ollama' | 'lmstudio'): Promise<string[]> {
+  try {
+    const url = provider === 'ollama'
+      ? `${baseUrl.replace(/\/+$/, '')}/api/tags`
+      : `${baseUrl.replace(/\/+$/, '')}/api/v1/models`;
+
+    const res = await fetch(url, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!res.ok) return [];
+
+    const data: any = await res.json();
+    const models: string[] = [];
+
+    if (provider === 'ollama' && data.models) {
+      for (const m of data.models) models.push(m.name || m.model);
+    } else if (data.data) {
+      for (const m of data.data) models.push(m.id || m.model);
+    } else if (Array.isArray(data)) {
+      for (const m of data) models.push(m.id || m.model || m);
+    }
+
+    return models;
+  } catch {
+    return [];
+  }
+}
+
 async function stepLocalAi(rl: readline.Interface): Promise<{ useLocalAi: boolean; ollamaUrl: string; ollamaModel: string; lmstudioUrl: string; lmstudioModel: string }> {
   header('Step 3: Local AI Backends');
   console.log('  Run AI models locally with Ollama or LM Studio.');
@@ -277,17 +307,46 @@ async function stepLocalAi(rl: readline.Interface): Promise<{ useLocalAi: boolea
     return { useLocalAi: false, ollamaUrl: '', ollamaModel: '', lmstudioUrl: '', lmstudioModel: '' };
   }
 
+  // ── Ollama ──
   console.log('');
   console.log(`  ${BOLD}Ollama${NC}`);
   const ollamaUrl = await ask(rl, 'Ollama endpoint URL', 'http://localhost:11434');
-  const ollamaModel = await ask(rl, 'Default Ollama model', 'llama3.3');
-  if (ollamaUrl) success(`Ollama: ${ollamaUrl} (${ollamaModel})`);
+  let ollamaModel = '';
 
+  if (ollamaUrl) {
+    info('Connecting to Ollama...');
+    const ollamaModels = await fetchModels(ollamaUrl, 'ollama');
+    if (ollamaModels.length > 0) {
+      success(`Found ${ollamaModels.length} model(s):`);
+      const idx = await askChoice(rl, 'Select default model:', ollamaModels, 0);
+      ollamaModel = ollamaModels[idx];
+      success(`Ollama: ${ollamaUrl} → ${BOLD}${ollamaModel}${NC}`);
+    } else {
+      warn('Could not connect or no models loaded. You can type a model name manually.');
+      ollamaModel = await ask(rl, 'Ollama model name', 'llama3.3');
+    }
+  }
+
+  // ── LM Studio ──
   console.log('');
   console.log(`  ${BOLD}LM Studio${NC}`);
-  const lmstudioUrl = await ask(rl, 'LM Studio endpoint URL', 'http://localhost:1234/v1');
-  const lmstudioModel = await ask(rl, 'Default LM Studio model', 'lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF');
-  if (lmstudioUrl) success(`LM Studio: ${lmstudioUrl} (${lmstudioModel})`);
+  const lmstudioUrl = await ask(rl, 'LM Studio endpoint URL', 'http://127.0.0.1:1234');
+  let lmstudioModel = '';
+
+  if (lmstudioUrl) {
+    info('Connecting to LM Studio...');
+    const lmModels = await fetchModels(lmstudioUrl, 'lmstudio');
+    if (lmModels.length > 0) {
+      success(`Found ${lmModels.length} model(s):`);
+      const idx = await askChoice(rl, 'Select default model:', lmModels, 0);
+      lmstudioModel = lmModels[idx];
+      success(`LM Studio: ${lmstudioUrl} → ${BOLD}${lmstudioModel}${NC}`);
+    } else {
+      warn('Could not connect or no models loaded. Make sure LM Studio server is running.');
+      warn('You can type a model name manually or re-run setup later.');
+      lmstudioModel = await ask(rl, 'LM Studio model name (or press Enter to skip)', '');
+    }
+  }
 
   return { useLocalAi, ollamaUrl, ollamaModel, lmstudioUrl, lmstudioModel };
 }
@@ -399,7 +458,7 @@ ${cfg.useLocalAi ? `      ollama_local:
       #   model: "llama3.3"
       # lmstudio_local:
       #   type: lmstudio
-      #   base_url: "http://localhost:1234/v1"
+      #   base_url: "http://127.0.0.1:1234"
       #   model: "lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF"`}
 
   agents:
@@ -489,7 +548,7 @@ GOOGLE_AI_API_KEY=${cfg.keys['google_ai_api_key'] || ''}
 
 # ── Local AI Backend Endpoints ─────────────────────────────────────────────
 OLLAMA_BASE_URL=${cfg.ollamaUrl || 'http://localhost:11434'}
-LMSTUDIO_BASE_URL=${cfg.lmstudioUrl || 'http://localhost:1234/v1'}
+LMSTUDIO_BASE_URL=${cfg.lmstudioUrl || 'http://127.0.0.1:1234'}
 
 # ── Bot Tokens ─────────────────────────────────────────────────────────────
 TELEGRAM_BOT_TOKEN=${cfg.keys['telegram_bot_token'] || ''}
