@@ -243,7 +243,13 @@ On first launch, Agent Cyplex runs an **interactive setup wizard** that guides y
 4. **Bot integrations** — Telegram, Discord, WhatsApp tokens
 5. **Daemon settings** — Log level, socket path
 
-All secrets are stored in an **AES-256-GCM encrypted keystore** at `~/.cyplex/keystore.enc` — no plaintext `.env` files.
+The wizard generates the following files under `~/.cyplex/`:
+
+| File | Purpose |
+|------|---------|
+| `~/.cyplex/.env` | API keys, endpoints, bot tokens, daemon settings — loaded into `process.env` on every launch |
+| `~/.cyplex/config.yaml` | Full daemon, gateway, agent, bot, and security configuration |
+| `~/.cyplex/keystore.enc` | AES-256-GCM encrypted copy of all secrets (backup keystore) |
 
 To re-run the wizard at any time:
 
@@ -251,11 +257,14 @@ To re-run the wizard at any time:
 agent-cyplex setup
 ```
 
-See [config/config.example.yaml](config/config.example.yaml) for full daemon, gateway, agent, and security configuration options. You can also edit config directly:
+You can also edit files directly:
 
 ```bash
-agent-cyplex config edit
+agent-cyplex config edit          # Open config.yaml in $EDITOR
+nano ~/.cyplex/.env               # Edit API keys manually
 ```
+
+See [config/config.example.yaml](config/config.example.yaml) for full configuration reference.
 
 ---
 
