@@ -1,14 +1,16 @@
 /**
- * Local model adapter — shared adapter for Ollama and LM Studio.
+ * Local model adapter — for LM Studio and Ollama local AI backends.
  *
- * Ollama exposes two API styles:
- *   - Native: /api/chat (always available)
- *   - OpenAI-compatible: /v1/chat/completions (available in newer versions)
+ * LM Studio API:
+ *   GET  /api/v1/models                        — List loaded models
+ *   POST /api/v1/chat                           — Chat completion
+ *   POST /api/v1/models/load                    — Load a model into memory
+ *   POST /api/v1/models/download                — Download a model
+ *   GET  /api/v1/models/download/status/:job_id — Check download progress
  *
- * LM Studio always uses: /v1/chat/completions
- *
- * This adapter auto-detects the correct endpoint and handles connection
- * errors with clear diagnostics.
+ * Ollama API (fallback):
+ *   GET  /api/tags                              — List models
+ *   POST /api/chat                              — Chat completion
  */
 
 import type { ModelClient } from './model_client.js';
@@ -27,8 +29,6 @@ export class LocalModelAdapter implements ModelClient {
   private baseUrl: string;
   private model: string;
   private timeoutMs: number;
-  private useNativeOllamaApi: boolean = false;
-  private endpointVerified: boolean = false;
 
   constructor(config: ProviderConfig) {
     this.provider = config.type; // 'ollama' or 'lmstudio'
@@ -39,59 +39,37 @@ export class LocalModelAdapter implements ModelClient {
 
   private defaultUrl(): string {
     return this.provider === 'lmstudio'
-      ? 'http://localhost:1234/v1'
+      ? 'http://localhost:1234'
       : 'http://localhost:11434';
   }
 
-  /**
-   * Test if the local model endpoint is reachable.
-   * Returns { ok, message } with diagnostics.
-   */
+  // ── Connection Testing ──────────────────────────────────────────────────
+
   async testConnection(): Promise<{ ok: boolean; message: string; models?: string[] }> {
-    // Step 1: Basic connectivity
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), CONNECT_TIMEOUT_MS);
+      const modelsUrl = this.provider === 'ollama'
+        ? `${this.baseUrl}/api/tags`
+        : `${this.baseUrl}/api/v1/models`;
 
-      let healthUrl: string;
-      if (this.provider === 'ollama') {
-        healthUrl = `${this.baseUrl}/api/tags`;
-      } else {
-        healthUrl = `${this.baseUrl}/models`;
-      }
-
-      const res = await fetch(healthUrl, {
+      const res = await fetch(modelsUrl, {
         method: 'GET',
-        signal: controller.signal,
+        signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
       });
-      clearTimeout(timer);
 
       if (!res.ok) {
-        // Ollama might not have /api/tags, try root
-        if (this.provider === 'ollama') {
-          const rootRes = await fetch(this.baseUrl, {
-            method: 'GET',
-            signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
-          });
-          if (rootRes.ok) {
-            return { ok: true, message: `Connected to Ollama at ${this.baseUrl}` };
-          }
-        }
-        return { ok: false, message: `${this.provider} responded with HTTP ${res.status} at ${healthUrl}` };
+        return { ok: false, message: `${this.provider} responded with HTTP ${res.status} at ${modelsUrl}` };
       }
 
-      // Try to list models
       const data: any = await res.json();
       const models: string[] = [];
 
       if (this.provider === 'ollama' && data.models) {
-        for (const m of data.models) {
-          models.push(m.name || m.model);
-        }
+        for (const m of data.models) models.push(m.name || m.model);
       } else if (data.data) {
-        for (const m of data.data) {
-          models.push(m.id);
-        }
+        // LM Studio /api/v1/models returns { data: [...] }
+        for (const m of data.data) models.push(m.id || m.model);
+      } else if (Array.isArray(data)) {
+        for (const m of data) models.push(m.id || m.model || m);
       }
 
       return {
@@ -100,90 +78,133 @@ export class LocalModelAdapter implements ModelClient {
         models: models.length > 0 ? models : undefined,
       };
     } catch (err: any) {
-      if (err.name === 'AbortError' || err.code === 'ABORT_ERR') {
-        return {
-          ok: false,
-          message: `Connection timed out after ${CONNECT_TIMEOUT_MS}ms. Is ${this.provider} running at ${this.baseUrl}?`,
-        };
-      }
-      if (err.cause?.code === 'ECONNREFUSED' || err.message?.includes('ECONNREFUSED')) {
-        return {
-          ok: false,
-          message: `Connection refused at ${this.baseUrl}. Make sure ${this.provider} is running:\n` +
-            (this.provider === 'ollama'
-              ? `    $ ollama serve\n    $ ollama run ${this.model}`
-              : `    Open LM Studio → Start Server`),
-        };
-      }
-      if (err.cause?.code === 'ENOTFOUND' || err.message?.includes('ENOTFOUND')) {
-        return {
-          ok: false,
-          message: `Host not found: ${this.baseUrl}. Check the URL is correct.`,
-        };
-      }
-      return {
-        ok: false,
-        message: `Connection failed: ${err.message || err}`,
-      };
+      return { ok: false, message: this.diagnoseError(err) };
     }
+  }
+
+  // ── Model Management (LM Studio) ───────────────────────────────────────
+
+  /**
+   * List available models.
+   * LM Studio: GET /api/v1/models
+   * Ollama:    GET /api/tags
+   */
+  async listModels(): Promise<string[]> {
+    const url = this.provider === 'ollama'
+      ? `${this.baseUrl}/api/tags`
+      : `${this.baseUrl}/api/v1/models`;
+
+    const res = await fetch(url, {
+      method: 'GET',
+      signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
+    });
+
+    if (!res.ok) throw new Error(`Failed to list models: HTTP ${res.status}`);
+
+    const data: any = await res.json();
+    const models: string[] = [];
+
+    if (this.provider === 'ollama' && data.models) {
+      for (const m of data.models) models.push(m.name || m.model);
+    } else if (data.data) {
+      for (const m of data.data) models.push(m.id || m.model);
+    } else if (Array.isArray(data)) {
+      for (const m of data) models.push(m.id || m.model || m);
+    }
+
+    return models;
   }
 
   /**
-   * Detect whether to use Ollama native API or OpenAI-compatible API.
+   * Load a model into memory.
+   * LM Studio: POST /api/v1/models/load
+   * Ollama:    POST /api/generate (with keep_alive)
    */
-  private async detectEndpoint(): Promise<void> {
-    if (this.endpointVerified) return;
+  async loadModel(modelName?: string): Promise<{ ok: boolean; message: string }> {
+    const name = modelName ?? this.model;
 
     if (this.provider === 'lmstudio') {
-      this.useNativeOllamaApi = false;
-      this.endpointVerified = true;
-      return;
-    }
-
-    // For Ollama, try OpenAI-compatible first, fall back to native
-    try {
-      const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+      const res = await fetch(`${this.baseUrl}/api/v1/models/load`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [{ role: 'user', content: 'test' }],
-          max_tokens: 1,
-          stream: false,
-        }),
+        body: JSON.stringify({ model: name }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        return { ok: false, message: `Failed to load model: HTTP ${res.status} — ${body}` };
+      }
+      return { ok: true, message: `Model "${name}" loaded` };
+    }
+
+    // Ollama: pull to ensure available
+    const res = await fetch(`${this.baseUrl}/api/pull`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, stream: false }),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      return { ok: false, message: `Failed to load model: HTTP ${res.status} — ${body}` };
+    }
+    return { ok: true, message: `Model "${name}" loaded` };
+  }
+
+  /**
+   * Download a model.
+   * LM Studio: POST /api/v1/models/download — returns job_id
+   * Ollama:    POST /api/pull (streaming status)
+   */
+  async downloadModel(modelName: string): Promise<{ jobId?: string; message: string }> {
+    if (this.provider === 'lmstudio') {
+      const res = await fetch(`${this.baseUrl}/api/v1/models/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelName }),
         signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
       });
 
-      if (res.ok || res.status === 400) {
-        // 400 means the endpoint exists but maybe model isn't loaded
-        this.useNativeOllamaApi = false;
-        this.endpointVerified = true;
-        return;
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`Download failed: HTTP ${res.status} — ${body}`);
       }
-    } catch {
-      // OpenAI-compat endpoint not available
+
+      const data: any = await res.json();
+      return { jobId: data.job_id || data.id, message: `Download started for "${modelName}"` };
     }
 
-    // Fall back to native Ollama API
-    this.useNativeOllamaApi = true;
-    this.endpointVerified = true;
+    // Ollama: streaming pull
+    return { message: `Use 'agent-cyplex model pull ${modelName}' for Ollama downloads` };
   }
 
-  private getCompletionUrl(): string {
-    if (this.useNativeOllamaApi) {
-      return `${this.baseUrl}/api/chat`;
+  /**
+   * Check download progress (LM Studio only).
+   * GET /api/v1/models/download/status/:job_id
+   */
+  async downloadStatus(jobId: string): Promise<{ status: string; progress?: number; message: string }> {
+    const res = await fetch(`${this.baseUrl}/api/v1/models/download/status/${jobId}`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Status check failed: HTTP ${res.status}`);
     }
-    // LM Studio base_url usually already ends with /v1
-    if (this.provider === 'lmstudio') {
-      const url = this.baseUrl.endsWith('/v1') ? this.baseUrl : `${this.baseUrl}/v1`;
-      return `${url}/chat/completions`;
-    }
-    return `${this.baseUrl}/v1/chat/completions`;
+
+    const data: any = await res.json();
+    return {
+      status: data.status || 'unknown',
+      progress: data.progress,
+      message: data.message || data.status || 'unknown',
+    };
   }
+
+  // ── Chat Completion ─────────────────────────────────────────────────────
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
-    await this.detectEndpoint();
-
     const model = request.model ?? this.model;
     const messages = this.buildMessages(request);
 
@@ -191,16 +212,32 @@ export class LocalModelAdapter implements ModelClient {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
-      const url = this.getCompletionUrl();
-      const body = this.useNativeOllamaApi
-        ? JSON.stringify({ model, messages, stream: false })
-        : JSON.stringify({
-            model,
-            messages,
-            max_tokens: request.max_tokens,
+      let url: string;
+      let body: string;
+
+      if (this.provider === 'lmstudio') {
+        // LM Studio: POST /api/v1/chat
+        url = `${this.baseUrl}/api/v1/chat`;
+        body = JSON.stringify({
+          model,
+          messages,
+          max_tokens: request.max_tokens,
+          temperature: request.temperature,
+          stream: false,
+        });
+      } else {
+        // Ollama: POST /api/chat
+        url = `${this.baseUrl}/api/chat`;
+        body = JSON.stringify({
+          model,
+          messages,
+          stream: false,
+          options: {
             temperature: request.temperature,
-            stream: false,
-          });
+            num_predict: request.max_tokens,
+          },
+        });
+      }
 
       const res = await fetch(url, {
         method: 'POST',
@@ -211,15 +248,13 @@ export class LocalModelAdapter implements ModelClient {
 
       if (!res.ok) {
         const errBody = await res.text();
-        throw new Error(
-          `${this.provider} API error (${res.status}): ${errBody}`
-        );
+        throw new Error(`${this.provider} API error (${res.status}): ${errBody}`);
       }
 
       const data: any = await res.json();
 
-      // Ollama native API returns differently
-      if (this.useNativeOllamaApi) {
+      if (this.provider === 'ollama') {
+        // Ollama native response
         return {
           id: `ollama-${Date.now()}`,
           content: data.message?.content ?? '',
@@ -233,10 +268,10 @@ export class LocalModelAdapter implements ModelClient {
         };
       }
 
-      // OpenAI-compatible response
+      // LM Studio response (OpenAI-compatible format)
       const choice = data.choices?.[0];
       return {
-        id: data.id ?? `local-${Date.now()}`,
+        id: data.id ?? `lmstudio-${Date.now()}`,
         content: choice?.message?.content ?? '',
         model: data.model ?? model,
         usage: {
@@ -247,27 +282,15 @@ export class LocalModelAdapter implements ModelClient {
         finish_reason: choice?.finish_reason ?? 'stop',
       };
     } catch (err: any) {
-      if (err.name === 'AbortError') {
-        throw new Error(
-          `${this.provider} request timed out after ${this.timeoutMs}ms. ` +
-          `The model may be loading — try again in a moment.`
-        );
-      }
-      if (err.cause?.code === 'ECONNREFUSED') {
-        throw new Error(
-          `Cannot connect to ${this.provider} at ${this.baseUrl}. ` +
-          `Make sure it's running.`
-        );
-      }
-      throw err;
+      throw new Error(this.diagnoseError(err));
     } finally {
       clearTimeout(timer);
     }
   }
 
-  async *stream(request: CompletionRequest): AsyncIterable<CompletionChunk> {
-    await this.detectEndpoint();
+  // ── Streaming ───────────────────────────────────────────────────────────
 
+  async *stream(request: CompletionRequest): AsyncIterable<CompletionChunk> {
     const model = request.model ?? this.model;
     const messages = this.buildMessages(request);
 
@@ -275,16 +298,30 @@ export class LocalModelAdapter implements ModelClient {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
-      const url = this.getCompletionUrl();
-      const body = this.useNativeOllamaApi
-        ? JSON.stringify({ model, messages, stream: true })
-        : JSON.stringify({
-            model,
-            messages,
-            max_tokens: request.max_tokens,
+      let url: string;
+      let body: string;
+
+      if (this.provider === 'lmstudio') {
+        url = `${this.baseUrl}/api/v1/chat`;
+        body = JSON.stringify({
+          model,
+          messages,
+          max_tokens: request.max_tokens,
+          temperature: request.temperature,
+          stream: true,
+        });
+      } else {
+        url = `${this.baseUrl}/api/chat`;
+        body = JSON.stringify({
+          model,
+          messages,
+          stream: true,
+          options: {
             temperature: request.temperature,
-            stream: true,
-          });
+            num_predict: request.max_tokens,
+          },
+        });
+      }
 
       const res = await fetch(url, {
         method: 'POST',
@@ -295,9 +332,7 @@ export class LocalModelAdapter implements ModelClient {
 
       if (!res.ok) {
         const errBody = await res.text();
-        throw new Error(
-          `${this.provider} API error (${res.status}): ${errBody}`
-        );
+        throw new Error(`${this.provider} API error (${res.status}): ${errBody}`);
       }
 
       if (!res.body) {
@@ -321,8 +356,8 @@ export class LocalModelAdapter implements ModelClient {
           const trimmed = line.trim();
           if (!trimmed) continue;
 
-          // Ollama native API streams JSON objects per line (no "data:" prefix)
-          if (this.useNativeOllamaApi) {
+          if (this.provider === 'ollama') {
+            // Ollama streams JSON objects per line (no SSE prefix)
             try {
               const data = JSON.parse(trimmed);
               if (data.done) return;
@@ -334,7 +369,7 @@ export class LocalModelAdapter implements ModelClient {
             continue;
           }
 
-          // OpenAI-compatible SSE format
+          // LM Studio: SSE format with "data: " prefix
           if (!trimmed.startsWith('data: ')) continue;
           const payload = trimmed.slice(6);
           if (payload === '[DONE]') return;
@@ -345,33 +380,23 @@ export class LocalModelAdapter implements ModelClient {
             if (!choice) continue;
 
             yield {
-              id: data.id ?? `local-${Date.now()}`,
+              id: data.id ?? `lmstudio-${Date.now()}`,
               delta: choice.delta?.content ?? '',
-              ...(choice.finish_reason
-                ? { finish_reason: choice.finish_reason }
-                : {}),
+              ...(choice.finish_reason ? { finish_reason: choice.finish_reason } : {}),
             };
           } catch {
-            // Skip malformed JSON lines.
+            // Skip malformed JSON
           }
         }
       }
     } catch (err: any) {
-      if (err.name === 'AbortError') {
-        throw new Error(
-          `${this.provider} stream timed out after ${this.timeoutMs}ms.`
-        );
-      }
-      if (err.cause?.code === 'ECONNREFUSED') {
-        throw new Error(
-          `Cannot connect to ${this.provider} at ${this.baseUrl}. Make sure it's running.`
-        );
-      }
-      throw err;
+      throw new Error(this.diagnoseError(err));
     } finally {
       clearTimeout(timer);
     }
   }
+
+  // ── Utilities ───────────────────────────────────────────────────────────
 
   countTokens(text: string): number {
     return Math.ceil(text.length / 4);
@@ -381,15 +406,26 @@ export class LocalModelAdapter implements ModelClient {
     request: CompletionRequest
   ): Array<{ role: string; content: string }> {
     const messages: Array<{ role: string; content: string }> = [];
-
     if (request.system) {
       messages.push({ role: 'system', content: request.system });
     }
-
     for (const msg of request.messages) {
       messages.push({ role: msg.role, content: msg.content });
     }
-
     return messages;
+  }
+
+  private diagnoseError(err: any): string {
+    if (err.name === 'AbortError' || err.code === 'ABORT_ERR') {
+      return `${this.provider} request timed out after ${this.timeoutMs}ms. The model may be loading — try again.`;
+    }
+    if (err.cause?.code === 'ECONNREFUSED' || err.message?.includes('ECONNREFUSED')) {
+      return `Connection refused at ${this.baseUrl}. Make sure ${this.provider} is running` +
+        (this.provider === 'ollama' ? ': ollama serve' : ': Open LM Studio → Start Server');
+    }
+    if (err.cause?.code === 'ENOTFOUND' || err.message?.includes('ENOTFOUND')) {
+      return `Host not found: ${this.baseUrl}. Check the URL is correct.`;
+    }
+    return err.message || String(err);
   }
 }
