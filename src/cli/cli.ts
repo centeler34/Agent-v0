@@ -18,6 +18,7 @@ import { registerKeysCommands } from './commands/keys_cmd.js';
 import { registerModelCommands } from './commands/model_cmd.js';
 import { isFirstRun, runSetupWizard } from './setup_wizard.js';
 import { runUpdate } from './updater.js';
+import { runUninstall } from './uninstaller.js';
 
 function loadEnvFile(): void {
   const envPath = path.join(process.env.HOME || '~', '.cyplex', '.env');
@@ -70,6 +71,13 @@ async function main(): Promise<void> {
       await runUpdate();
     });
 
+  // Uninstall command
+  program.command('uninstall')
+    .description('Remove Agent Cyplex, all config, data, and system links')
+    .action(async () => {
+      await runUninstall();
+    });
+
   registerDaemonCommands(program);
   registerAgentCommands(program);
   registerTaskCommands(program);
@@ -106,10 +114,11 @@ async function launchRepl(): Promise<void> {
       if (trimmed === 'help' || trimmed === '/help') {
         console.log('Commands: daemon, agent, task, session, skill, config, audit, bot, keys, model');
         console.log('');
-        console.log('  /update    — Fetch latest updates from GitHub, rebuild, and restart');
-        console.log('  /setup     — Re-run the setup wizard');
-        console.log('  /status    — Query daemon status');
-        console.log('  exit       — Quit the REPL');
+        console.log('  /update      — Fetch latest updates from GitHub, rebuild, and restart');
+        console.log('  /setup       — Re-run the setup wizard');
+        console.log('  /uninstall   — Remove Agent Cyplex completely');
+        console.log('  /status      — Query daemon status');
+        console.log('  exit         — Quit the REPL');
       } else if (trimmed === '/update') {
         rl.close();
         await runUpdate();
@@ -117,6 +126,10 @@ async function launchRepl(): Promise<void> {
       } else if (trimmed === '/setup') {
         rl.close();
         await runSetupWizard();
+        return;
+      } else if (trimmed === '/uninstall') {
+        rl.close();
+        await runUninstall();
         return;
       } else if (trimmed === '/status' || trimmed.startsWith('\\status')) {
         console.log('Querying daemon status...');

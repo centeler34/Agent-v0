@@ -290,6 +290,7 @@ Inside the REPL, slash commands are available:
 |---------|--------|
 | `/update` | Fetch latest updates from GitHub, rebuild all components, and restart |
 | `/setup` | Re-run the setup wizard to reconfigure API keys and settings |
+| `/uninstall` | Remove Agent Cyplex completely (config, data, binaries) |
 | `/status` | Query daemon status |
 | `/help` | Show available commands |
 | `exit` | Quit the REPL |
