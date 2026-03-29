@@ -235,30 +235,27 @@ npm link
 
 ## Configuration
 
-Copy the example config and environment files:
+On first launch, Agent Cyplex runs an **interactive setup wizard** that guides you through:
+
+1. **Master password** — Encrypts all API keys in the keystore
+2. **Cloud AI providers** — Anthropic, OpenAI, Gemini API keys
+3. **Local AI backends** — Ollama and LM Studio endpoints
+4. **Bot integrations** — Telegram, Discord, WhatsApp tokens
+5. **Daemon settings** — Log level, socket path
+
+All secrets are stored in an **AES-256-GCM encrypted keystore** at `~/.cyplex/keystore.enc` — no plaintext `.env` files.
+
+To re-run the wizard at any time:
 
 ```bash
-cp config/config.example.yaml ~/.cyplex/config.yaml
-cp .env.example .env
+agent-cyplex setup
 ```
 
-Edit `.env` to add your API keys:
+See [config/config.example.yaml](config/config.example.yaml) for full daemon, gateway, agent, and security configuration options. You can also edit config directly:
 
-```env
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-GOOGLE_AI_API_KEY=AI...
-
-# Optional: Bot tokens
-TELEGRAM_BOT_TOKEN=...
-DISCORD_BOT_TOKEN=...
-
-# Optional: Local AI endpoints
-OLLAMA_BASE_URL=http://localhost:11434
-LMSTUDIO_BASE_URL=http://localhost:1234/v1
+```bash
+agent-cyplex config edit
 ```
-
-See [config/config.example.yaml](config/config.example.yaml) for full daemon, gateway, agent, and security configuration options.
 
 ---
 
