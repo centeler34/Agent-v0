@@ -201,7 +201,7 @@ clone_repo() {
 
 build_typescript() {
     info "Installing Node.js dependencies..."
-    npm install --production=false 2>&1 | tail -1
+    npm install --legacy-peer-deps 2>&1 | tail -1
 
     info "Compiling TypeScript..."
     npx tsc
