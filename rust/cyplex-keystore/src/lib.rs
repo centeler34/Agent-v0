@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     fn public_api_workflow() {
-        let (master_key, salt) = MasterKey::derive("pw").unwrap();
+        let (_master_key, salt) = MasterKey::derive("pw").unwrap();
         let mut store = KeyStore::new(salt);
 
         set(&mut store, "token", b"abc123");

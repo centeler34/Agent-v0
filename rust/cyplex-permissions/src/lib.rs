@@ -18,8 +18,6 @@ pub use evaluator::{evaluate, PermissionDecision, PermissionRequest};
 pub use network_guard::NetworkGuard;
 pub use policy::AgentPolicy;
 
-use std::path::PathBuf;
-
 /// Check a permission request against a policy, returning the decision.
 ///
 /// This is the primary entry-point for call-sites that only need an
@@ -60,6 +58,7 @@ pub fn policy_from_yaml(input: &str) -> Result<AgentPolicy, PermissionError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn check_returns_allow() {

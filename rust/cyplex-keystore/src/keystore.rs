@@ -154,7 +154,6 @@ fn chrono_now() -> String {
 mod tests {
     use super::*;
     use crate::master_key::MasterKey;
-    use std::path::PathBuf;
 
     #[test]
     fn roundtrip_save_load() {
