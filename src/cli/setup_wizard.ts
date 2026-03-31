@@ -16,55 +16,79 @@ const KEYSTORE_PATH = path.join(CYPLEX_DIR, 'keystore.enc');
 const SETUP_MARKER = path.join(CYPLEX_DIR, '.setup-complete');
 const ENV_PATH = path.join(CYPLEX_DIR, '.env');
 
-// ── Terminal helpers ──────────────────────────────────────────────────────
+// ── ANSI Palette ─────────────────────────────────────────────────────────────
 
-const CYAN = '\x1b[36m';
-const GREEN = '\x1b[32m';
-const YELLOW = '\x1b[33m';
-const RED = '\x1b[31m';
-const BOLD = '\x1b[1m';
-const DIM = '\x1b[2m';
-const NC = '\x1b[0m';
+const x = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  italic: '\x1b[3m',
 
-function banner(): void {
-  console.log(`${CYAN}`);
-  console.log(`  ___                    _      ____            _           `);
-  console.log(` / _ \\  __ _  ___ _ __ | |_   / ___|_   _ _ __| | _____  __`);
-  console.log(`| |_| |/ _\` |/ _ \\ '_ \\| __| | |   | | | | '_ \\ |/ _ \\ \\/ /`);
-  console.log(`| | | | (_| |  __/ | | | |_  | |___| |_| | |_) | |  __/>  < `);
-  console.log(`|_| |_|\\__, |\\___|_| |_|\\__|  \\____|\\__, | .__/|_|\\___/_/\\_\\`);
-  console.log(`       |___/                         |___/|_|               `);
-  console.log(`${NC}`);
-  console.log(`${BOLD}  Multi-Agent AI Orchestration Terminal${NC}`);
-  console.log(`${DIM}  v0.1.0 — Security Research Edition${NC}`);
+  white: '\x1b[37m',
+  gray: '\x1b[90m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+
+  brightCyan: '\x1b[96m',
+  brightWhite: '\x1b[97m',
+  brightGreen: '\x1b[92m',
+  brightYellow: '\x1b[93m',
+  brightRed: '\x1b[91m',
+
+  teal: '\x1b[38;5;43m',
+  purple: '\x1b[38;5;141m',
+  orange: '\x1b[38;5;208m',
+  darkGray: '\x1b[38;5;238m',
+  slate: '\x1b[38;5;245m',
+};
+
+// ── Drawing Helpers ──────────────────────────────────────────────────────────
+
+function getTermWidth(): number {
+  return process.stdout.columns || 80;
+}
+
+function boxLine(lines: string[], borderColor: string = x.darkGray): string {
+  const w = Math.min(getTermWidth() - 2, 72);
+  const top    = `${borderColor}╭${'─'.repeat(w - 2)}╮${x.reset}`;
+  const bottom = `${borderColor}╰${'─'.repeat(w - 2)}╯${x.reset}`;
+  const padded = lines.map(line => {
+    const visible = line.replace(/\x1b\[[0-9;]*m/g, '');
+    const pad = Math.max(0, w - 4 - visible.length);
+    return `${borderColor}│${x.reset} ${line}${' '.repeat(pad)} ${borderColor}│${x.reset}`;
+  });
+  return [top, ...padded, bottom].join('\n');
+}
+
+function stepHeader(num: number, total: number, title: string): void {
+  console.log('');
+  console.log(`  ${x.darkGray}╭──────────────────────────────────────────────────────────╮${x.reset}`);
+  console.log(`  ${x.darkGray}│${x.reset}  ${x.brightCyan}${x.bold}Step ${num}/${total}${x.reset}  ${x.dim}─${x.reset}  ${x.bold}${x.white}${title}${x.reset}${' '.repeat(Math.max(0, 42 - title.length))}${x.darkGray}│${x.reset}`);
+  console.log(`  ${x.darkGray}╰──────────────────────────────────────────────────────────╯${x.reset}`);
   console.log('');
 }
 
-function header(text: string): void {
-  console.log('');
-  console.log(`${CYAN}${'─'.repeat(60)}${NC}`);
-  console.log(`${BOLD}  ${text}${NC}`);
-  console.log(`${CYAN}${'─'.repeat(60)}${NC}`);
-  console.log('');
+function logInfo(text: string): void {
+  console.log(`    ${x.cyan}●${x.reset} ${text}`);
 }
 
-function info(text: string): void {
-  console.log(`  ${CYAN}[*]${NC} ${text}`);
+function logSuccess(text: string): void {
+  console.log(`    ${x.green}✓${x.reset} ${text}`);
 }
 
-function success(text: string): void {
-  console.log(`  ${GREEN}[+]${NC} ${text}`);
+function logWarn(text: string): void {
+  console.log(`    ${x.yellow}○${x.reset} ${x.dim}${text}${x.reset}`);
 }
 
-function warn(text: string): void {
-  console.log(`  ${YELLOW}[!]${NC} ${text}`);
+function logError(text: string): void {
+  console.log(`    ${x.red}✗${x.reset} ${text}`);
 }
 
-function error(text: string): void {
-  console.log(`  ${RED}[x]${NC} ${text}`);
-}
-
-// ── Input helpers ─────────────────────────────────────────────────────────
+// ── Input Helpers ────────────────────────────────────────────────────────────
 
 function createRl(): readline.Interface {
   return readline.createInterface({
@@ -74,9 +98,9 @@ function createRl(): readline.Interface {
 }
 
 async function ask(rl: readline.Interface, question: string, defaultVal?: string): Promise<string> {
-  const suffix = defaultVal ? ` ${DIM}[${defaultVal}]${NC}` : '';
+  const suffix = defaultVal ? ` ${x.darkGray}[${x.slate}${defaultVal}${x.darkGray}]${x.reset}` : '';
   return new Promise((resolve) => {
-    rl.question(`  ${question}${suffix}: `, (answer) => {
+    rl.question(`    ${x.brightCyan}?${x.reset} ${question}${suffix}${x.dim}: ${x.reset}`, (answer) => {
       resolve(answer.trim() || defaultVal || '');
     });
   });
@@ -84,7 +108,7 @@ async function ask(rl: readline.Interface, question: string, defaultVal?: string
 
 async function askSecret(rl: readline.Interface, question: string): Promise<string> {
   return new Promise((resolve) => {
-    process.stdout.write(`  ${question}: `);
+    process.stdout.write(`    ${x.brightCyan}?${x.reset} ${question}${x.dim}: ${x.reset}`);
 
     const stdin = process.stdin;
     const wasRaw = stdin.isRaw;
@@ -95,24 +119,23 @@ async function askSecret(rl: readline.Interface, question: string): Promise<stri
 
     let input = '';
     const onData = (char: Buffer) => {
-      const c = char.toString();
-      if (c === '\n' || c === '\r') {
+      const ch = char.toString();
+      if (ch === '\n' || ch === '\r') {
         if (stdin.isTTY) stdin.setRawMode(wasRaw ?? false);
         stdin.removeListener('data', onData);
         process.stdout.write('\n');
         resolve(input.trim());
-      } else if (c === '\u007f' || c === '\b') {
+      } else if (ch === '\u007f' || ch === '\b') {
         if (input.length > 0) {
           input = input.slice(0, -1);
           process.stdout.write('\b \b');
         }
-      } else if (c === '\u0003') {
-        // Ctrl+C
+      } else if (ch === '\u0003') {
         process.stdout.write('\n');
         process.exit(0);
       } else {
-        input += c;
-        process.stdout.write('*');
+        input += ch;
+        process.stdout.write(`${x.cyan}*${x.reset}`);
       }
     };
     stdin.on('data', onData);
@@ -121,25 +144,33 @@ async function askSecret(rl: readline.Interface, question: string): Promise<stri
 }
 
 async function askYesNo(rl: readline.Interface, question: string, defaultVal: boolean = false): Promise<boolean> {
-  const hint = defaultVal ? 'Y/n' : 'y/N';
-  const answer = await ask(rl, `${question} (${hint})`);
+  const hint = defaultVal
+    ? `${x.green}Y${x.dim}/${x.slate}n${x.reset}`
+    : `${x.slate}y${x.dim}/${x.green}N${x.reset}`;
+  const answer = await ask(rl, `${question} (${hint})${x.reset}`);
   if (answer === '') return defaultVal;
   return answer.toLowerCase().startsWith('y');
 }
 
 async function askChoice(rl: readline.Interface, question: string, options: string[], defaultIdx: number = 0): Promise<number> {
-  console.log(`  ${question}`);
+  console.log(`    ${x.brightCyan}?${x.reset} ${question}`);
+  console.log('');
   for (let i = 0; i < options.length; i++) {
-    const marker = i === defaultIdx ? `${GREEN}>${NC}` : ' ';
-    console.log(`    ${marker} ${i + 1}) ${options[i]}`);
+    const isDefault = i === defaultIdx;
+    const marker = isDefault ? `${x.green}❯${x.reset}` : `${x.darkGray} ${x.reset}`;
+    const label = isDefault
+      ? `${x.white}${x.bold}${options[i]}${x.reset}`
+      : `${x.slate}${options[i]}${x.reset}`;
+    console.log(`      ${marker} ${x.darkGray}${i + 1})${x.reset} ${label}`);
   }
-  const answer = await ask(rl, `  Choice`, String(defaultIdx + 1));
+  console.log('');
+  const answer = await ask(rl, `Choice`, String(defaultIdx + 1));
   const idx = parseInt(answer, 10) - 1;
   if (idx >= 0 && idx < options.length) return idx;
   return defaultIdx;
 }
 
-// ── Setup Steps ───────────────────────────────────────────────────────────
+// ── Setup Steps ──────────────────────────────────────────────────────────────
 
 interface SetupConfig {
   masterPassword: string;
@@ -160,88 +191,107 @@ interface SetupConfig {
   socketPath: string;
 }
 
+function printWizardBanner(): void {
+  console.clear();
+  console.log('');
+  console.log(`  ${x.brightCyan}${x.bold}  ██████╗██╗   ██╗██████╗ ██╗     ███████╗██╗  ██╗${x.reset}`);
+  console.log(`  ${x.brightCyan}${x.bold} ██╔════╝╚██╗ ██╔╝██╔══██╗██║     ██╔════╝╚██╗██╔╝${x.reset}`);
+  console.log(`  ${x.cyan}${x.bold} ██║      ╚████╔╝ ██████╔╝██║     █████╗   ╚███╔╝${x.reset}`);
+  console.log(`  ${x.blue}${x.bold} ██║       ╚██╔╝  ██╔═══╝ ██║     ██╔══╝   ██╔██╗${x.reset}`);
+  console.log(`  ${x.blue}${x.bold} ╚██████╗   ██║   ██║     ███████╗███████╗██╔╝ ██╗${x.reset}`);
+  console.log(`  ${x.blue}${x.bold}  ╚═════╝   ╚═╝   ╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝${x.reset}`);
+  console.log('');
+  console.log(`  ${x.bold}${x.white}  Setup Wizard${x.reset}  ${x.dim}v0.1.0${x.reset}`);
+  console.log(`  ${x.dim}  First-time configuration${x.reset}`);
+  console.log('');
+}
+
 async function stepWelcome(rl: readline.Interface): Promise<void> {
-  console.log(`  Welcome to ${BOLD}Agent Cyplex${NC} — your multi-agent AI orchestration terminal.`);
+  console.log(boxLine([
+    `${x.bold}${x.white}Welcome to Agent Cyplex${x.reset}`,
+    `${x.dim}Multi-Agent AI Orchestration Terminal${x.reset}`,
+    ``,
+    `${x.white}This wizard configures:${x.reset}`,
+    ``,
+    `  ${x.brightCyan}01${x.reset}  ${x.white}Master password${x.reset}     ${x.dim}AES-256 encrypted keystore${x.reset}`,
+    `  ${x.brightCyan}02${x.reset}  ${x.white}Cloud AI providers${x.reset}  ${x.dim}Anthropic, OpenAI, Gemini${x.reset}`,
+    `  ${x.brightCyan}03${x.reset}  ${x.white}Local AI backends${x.reset}   ${x.dim}Ollama, LM Studio${x.reset}`,
+    `  ${x.brightCyan}04${x.reset}  ${x.white}Bot integrations${x.reset}    ${x.dim}Telegram, Discord, WhatsApp${x.reset}`,
+    `  ${x.brightCyan}05${x.reset}  ${x.white}Daemon settings${x.reset}     ${x.dim}Logging, socket config${x.reset}`,
+    ``,
+    `${x.dim}Re-run anytime: ${x.white}agent-cyplex setup${x.reset}`,
+  ]));
   console.log('');
-  console.log('  This wizard will help you configure:');
-  console.log('');
-  console.log(`    ${CYAN}1.${NC} Master password for encrypted keystore`);
-  console.log(`    ${CYAN}2.${NC} AI provider API keys (Anthropic, OpenAI, Gemini)`);
-  console.log(`    ${CYAN}3.${NC} Local AI backends (Ollama, LM Studio)`);
-  console.log(`    ${CYAN}4.${NC} Bot integrations (Telegram, Discord, WhatsApp)`);
-  console.log(`    ${CYAN}5.${NC} Daemon & security settings`);
-  console.log('');
-  console.log(`  ${DIM}You can re-run this wizard anytime with: agent-cyplex setup${NC}`);
-  console.log('');
-  await ask(rl, `Press ${BOLD}Enter${NC} to continue`);
+  await ask(rl, `Press ${x.bold}Enter${x.reset} to begin`);
 }
 
 async function stepMasterPassword(rl: readline.Interface): Promise<string> {
-  header('Step 1: Master Password');
-  console.log(`  Your master password encrypts all API keys and secrets.`);
-  console.log(`  ${YELLOW}Choose a strong password — it cannot be recovered if lost.${NC}`);
+  stepHeader(1, 5, 'Master Password');
+  console.log(`    ${x.white}Your master password encrypts all API keys and secrets.${x.reset}`);
+  console.log(`    ${x.yellow}Choose a strong password — it cannot be recovered if lost.${x.reset}`);
   console.log('');
 
   let password = '';
   while (true) {
     password = await askSecret(rl, 'Enter master password');
     if (password.length < 8) {
-      error('Password must be at least 8 characters');
+      logError('Password must be at least 8 characters');
       continue;
     }
     const confirm = await askSecret(rl, 'Confirm master password');
     if (password !== confirm) {
-      error('Passwords do not match');
+      logError('Passwords do not match');
       continue;
     }
     break;
   }
-  success('Master password set');
+  console.log('');
+  logSuccess('Master password set');
   return password;
 }
 
 async function stepCloudProviders(rl: readline.Interface): Promise<{ keys: Record<string, string>; defaultProvider: string; fallbackProvider: string }> {
-  header('Step 2: Cloud AI Providers');
-  console.log('  Configure API keys for cloud AI providers.');
-  console.log(`  ${DIM}Press Enter to skip any provider you don't want to use.${NC}`);
+  stepHeader(2, 5, 'Cloud AI Providers');
+  console.log(`    ${x.white}Configure API keys for cloud AI providers.${x.reset}`);
+  console.log(`    ${x.dim}Press Enter to skip any provider you don't use.${x.reset}`);
   console.log('');
 
   const keys: Record<string, string> = {};
 
   // Anthropic
-  console.log(`  ${BOLD}Anthropic (Claude)${NC}`);
+  console.log(`    ${x.purple}┃${x.reset} ${x.bold}${x.white}Anthropic${x.reset} ${x.dim}(Claude)${x.reset}`);
   const anthropicKey = await askSecret(rl, 'API key (sk-ant-...)');
   if (anthropicKey) {
     keys['anthropic_api_key'] = anthropicKey;
-    success('Anthropic API key saved');
+    logSuccess('Anthropic key saved');
   } else {
-    warn('Anthropic skipped');
+    logWarn('Anthropic skipped');
   }
   console.log('');
 
   // OpenAI
-  console.log(`  ${BOLD}OpenAI (GPT)${NC}`);
+  console.log(`    ${x.green}┃${x.reset} ${x.bold}${x.white}OpenAI${x.reset} ${x.dim}(GPT)${x.reset}`);
   const openaiKey = await askSecret(rl, 'API key (sk-...)');
   if (openaiKey) {
     keys['openai_api_key'] = openaiKey;
-    success('OpenAI API key saved');
+    logSuccess('OpenAI key saved');
   } else {
-    warn('OpenAI skipped');
+    logWarn('OpenAI skipped');
   }
   console.log('');
 
   // Gemini
-  console.log(`  ${BOLD}Google Gemini${NC}`);
+  console.log(`    ${x.blue}┃${x.reset} ${x.bold}${x.white}Google Gemini${x.reset}`);
   const geminiKey = await askSecret(rl, 'API key (AI...)');
   if (geminiKey) {
     keys['google_ai_api_key'] = geminiKey;
-    success('Gemini API key saved');
+    logSuccess('Gemini key saved');
   } else {
-    warn('Gemini skipped');
+    logWarn('Gemini skipped');
   }
   console.log('');
 
-  // Default provider selection
+  // Default provider
   const configured = [];
   if (keys['anthropic_api_key']) configured.push('anthropic');
   if (keys['openai_api_key']) configured.push('openai');
@@ -260,7 +310,7 @@ async function stepCloudProviders(rl: readline.Interface): Promise<{ keys: Recor
       fallbackProvider = remaining[fbIdx];
     }
   } else {
-    warn('No cloud providers configured — you can use local AI or add keys later');
+    logWarn('No cloud providers configured — use local AI or add keys later');
   }
 
   return { keys, defaultProvider, fallbackProvider };
@@ -269,8 +319,6 @@ async function stepCloudProviders(rl: readline.Interface): Promise<{ keys: Recor
 async function fetchModels(baseUrl: string, provider: 'ollama' | 'lmstudio'): Promise<string[]> {
   try {
     const base = baseUrl.replace(/\/+$/, '');
-    // Ollama: GET /api/tags → { models: [{ name }] }
-    // LM Studio: GET /v1/models → { data: [{ id }] }
     const url = provider === 'ollama'
       ? `${base}/api/tags`
       : `${base}/v1/models`;
@@ -298,9 +346,9 @@ async function fetchModels(baseUrl: string, provider: 'ollama' | 'lmstudio'): Pr
 }
 
 async function stepLocalAi(rl: readline.Interface): Promise<{ useLocalAi: boolean; ollamaUrl: string; ollamaModel: string; lmstudioUrl: string; lmstudioModel: string }> {
-  header('Step 3: Local AI Backends');
-  console.log('  Run AI models locally with Ollama or LM Studio.');
-  console.log(`  ${DIM}No API keys needed — completely offline.${NC}`);
+  stepHeader(3, 5, 'Local AI Backends');
+  console.log(`    ${x.white}Run AI models locally with Ollama or LM Studio.${x.reset}`);
+  console.log(`    ${x.dim}No API keys needed — completely offline & private.${x.reset}`);
   console.log('');
 
   const useLocalAi = await askYesNo(rl, 'Configure local AI backends?', true);
@@ -310,42 +358,42 @@ async function stepLocalAi(rl: readline.Interface): Promise<{ useLocalAi: boolea
 
   // ── Ollama ──
   console.log('');
-  console.log(`  ${BOLD}Ollama${NC}`);
-  const ollamaUrl = await ask(rl, 'Ollama endpoint URL', 'http://localhost:11434');
+  console.log(`    ${x.orange}┃${x.reset} ${x.bold}${x.white}Ollama${x.reset}`);
+  const ollamaUrl = await ask(rl, 'Endpoint URL', 'http://localhost:11434');
   let ollamaModel = '';
 
   if (ollamaUrl) {
-    info('Connecting to Ollama...');
+    logInfo('Connecting to Ollama...');
     const ollamaModels = await fetchModels(ollamaUrl, 'ollama');
     if (ollamaModels.length > 0) {
-      success(`Found ${ollamaModels.length} model(s):`);
+      logSuccess(`Found ${ollamaModels.length} model(s)`);
       const idx = await askChoice(rl, 'Select default model:', ollamaModels, 0);
       ollamaModel = ollamaModels[idx];
-      success(`Ollama: ${ollamaUrl} → ${BOLD}${ollamaModel}${NC}`);
+      logSuccess(`Selected: ${x.bold}${ollamaModel}${x.reset}`);
     } else {
-      warn('Could not connect or no models loaded. You can type a model name manually.');
-      ollamaModel = await ask(rl, 'Ollama model name', 'llama3.3');
+      logWarn('Could not connect or no models loaded');
+      ollamaModel = await ask(rl, 'Model name (manual)', 'llama3.3');
     }
   }
 
   // ── LM Studio ──
   console.log('');
-  console.log(`  ${BOLD}LM Studio${NC}`);
-  const lmstudioUrl = await ask(rl, 'LM Studio endpoint URL', 'http://127.0.0.1:1234');
+  console.log(`    ${x.teal}┃${x.reset} ${x.bold}${x.white}LM Studio${x.reset}`);
+  const lmstudioUrl = await ask(rl, 'Endpoint URL', 'http://127.0.0.1:1234');
   let lmstudioModel = '';
 
   if (lmstudioUrl) {
-    info('Connecting to LM Studio...');
+    logInfo('Connecting to LM Studio...');
     const lmModels = await fetchModels(lmstudioUrl, 'lmstudio');
     if (lmModels.length > 0) {
-      success(`Found ${lmModels.length} model(s):`);
+      logSuccess(`Found ${lmModels.length} model(s)`);
       const idx = await askChoice(rl, 'Select default model:', lmModels, 0);
       lmstudioModel = lmModels[idx];
-      success(`LM Studio: ${lmstudioUrl} → ${BOLD}${lmstudioModel}${NC}`);
+      logSuccess(`Selected: ${x.bold}${lmstudioModel}${x.reset}`);
     } else {
-      warn('Could not connect or no models loaded. Make sure LM Studio server is running.');
-      warn('You can type a model name manually or re-run setup later.');
-      lmstudioModel = await ask(rl, 'LM Studio model name (or press Enter to skip)', '');
+      logWarn('Could not connect or no models loaded');
+      logWarn('Make sure LM Studio server is running, or re-run setup later');
+      lmstudioModel = await ask(rl, 'Model name (or Enter to skip)', '');
     }
   }
 
@@ -353,49 +401,52 @@ async function stepLocalAi(rl: readline.Interface): Promise<{ useLocalAi: boolea
 }
 
 async function stepBots(rl: readline.Interface): Promise<{ enableTelegram: boolean; telegramToken: string; enableDiscord: boolean; discordToken: string; enableWhatsapp: boolean; botKeys: Record<string, string> }> {
-  header('Step 4: Bot Integrations');
-  console.log('  Receive tasks from chat platforms.');
-  console.log(`  ${DIM}Press Enter to skip any integration.${NC}`);
+  stepHeader(4, 5, 'Bot Integrations');
+  console.log(`    ${x.white}Receive tasks from chat platforms.${x.reset}`);
+  console.log(`    ${x.dim}Press Enter to skip any integration.${x.reset}`);
   console.log('');
 
   const botKeys: Record<string, string> = {};
 
   // Telegram
+  console.log(`    ${x.blue}┃${x.reset} ${x.bold}${x.white}Telegram${x.reset}`);
   const enableTelegram = await askYesNo(rl, 'Enable Telegram bot?', false);
   let telegramToken = '';
   if (enableTelegram) {
-    telegramToken = await askSecret(rl, 'Telegram bot token');
+    telegramToken = await askSecret(rl, 'Bot token');
     if (telegramToken) {
       botKeys['telegram_bot_token'] = telegramToken;
-      success('Telegram configured');
+      logSuccess('Telegram configured');
     }
   }
   console.log('');
 
   // Discord
+  console.log(`    ${x.purple}┃${x.reset} ${x.bold}${x.white}Discord${x.reset}`);
   const enableDiscord = await askYesNo(rl, 'Enable Discord bot?', false);
   let discordToken = '';
   if (enableDiscord) {
-    discordToken = await askSecret(rl, 'Discord bot token');
+    discordToken = await askSecret(rl, 'Bot token');
     if (discordToken) {
       botKeys['discord_bot_token'] = discordToken;
-      success('Discord configured');
+      logSuccess('Discord configured');
     }
   }
   console.log('');
 
   // WhatsApp
+  console.log(`    ${x.green}┃${x.reset} ${x.bold}${x.white}WhatsApp${x.reset}`);
   const enableWhatsapp = await askYesNo(rl, 'Enable WhatsApp bot?', false);
   if (enableWhatsapp) {
-    info('WhatsApp uses QR-code pairing — will be configured on first bot start');
+    logInfo('WhatsApp uses QR-code pairing — configured on first bot start');
   }
 
   return { enableTelegram, telegramToken, enableDiscord, discordToken, enableWhatsapp, botKeys };
 }
 
 async function stepDaemon(rl: readline.Interface): Promise<{ logLevel: string; socketPath: string }> {
-  header('Step 5: Daemon & Security Settings');
-  console.log('  Configure the background daemon.');
+  stepHeader(5, 5, 'Daemon & Security');
+  console.log(`    ${x.white}Configure the background daemon process.${x.reset}`);
   console.log('');
 
   const logIdx = await askChoice(rl, 'Log level:', ['debug', 'info', 'warn', 'error'], 1);
@@ -408,7 +459,7 @@ async function stepDaemon(rl: readline.Interface): Promise<{ logLevel: string; s
   return { logLevel, socketPath };
 }
 
-// ── Config Generation ─────────────────────────────────────────────────────
+// ── Config Generation ────────────────────────────────────────────────────────
 
 function generateConfig(cfg: SetupConfig): string {
   return `cyplex:
@@ -564,7 +615,7 @@ CYPLEX_LOG_LEVEL=${cfg.daemonLogLevel}
 `;
 }
 
-// ── Main Setup Flow ───────────────────────────────────────────────────────
+// ── Main Setup Flow ──────────────────────────────────────────────────────────
 
 export function isFirstRun(): boolean {
   return !fs.existsSync(SETUP_MARKER);
@@ -574,27 +625,22 @@ export async function runSetupWizard(): Promise<void> {
   const rl = createRl();
 
   try {
-    banner();
+    printWizardBanner();
     await stepWelcome(rl);
 
-    // Step 1: Master password
     const masterPassword = await stepMasterPassword(rl);
-
-    // Step 2: Cloud providers
     const { keys: cloudKeys, defaultProvider, fallbackProvider } = await stepCloudProviders(rl);
-
-    // Step 3: Local AI
     const localAi = await stepLocalAi(rl);
-
-    // Step 4: Bots
     const bots = await stepBots(rl);
-
-    // Step 5: Daemon settings
     const daemon = await stepDaemon(rl);
 
-    // ── Write everything ─────────────────────────────────────────────────
+    // ── Finalize ───────────────────────────────────────────────────────────
 
-    header('Finalizing Setup');
+    console.log('');
+    console.log(`  ${x.darkGray}╭──────────────────────────────────────────────────────────╮${x.reset}`);
+    console.log(`  ${x.darkGray}│${x.reset}  ${x.brightGreen}${x.bold}Finalizing${x.reset}  ${x.dim}─  Writing configuration files${x.reset}             ${x.darkGray}│${x.reset}`);
+    console.log(`  ${x.darkGray}╰──────────────────────────────────────────────────────────╯${x.reset}`);
+    console.log('');
 
     // Create directories
     const dirs = [
@@ -610,7 +656,7 @@ export async function runSetupWizard(): Promise<void> {
     for (const dir of dirs) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    success('Created ~/.cyplex/ directory structure');
+    logSuccess('Created ~/.cyplex/ directory structure');
 
     // Save keys to encrypted keystore
     const allKeys = { ...cloudKeys, ...bots.botKeys };
@@ -621,10 +667,10 @@ export async function runSetupWizard(): Promise<void> {
         if (value) keystore.set(name, value);
       }
       keystore.save(KEYSTORE_PATH);
-      success(`Saved ${Object.keys(allKeys).length} key(s) to encrypted keystore`);
+      logSuccess(`Saved ${Object.keys(allKeys).length} key(s) to encrypted keystore`);
     }
 
-    // Generate and write config
+    // Generate config
     const cfg: SetupConfig = {
       masterPassword,
       defaultProvider,
@@ -644,43 +690,38 @@ export async function runSetupWizard(): Promise<void> {
       socketPath: daemon.socketPath,
     };
 
-    const configYaml = generateConfig(cfg);
-    fs.writeFileSync(CONFIG_PATH, configYaml, 'utf-8');
-    success('Generated ~/.cyplex/config.yaml');
+    fs.writeFileSync(CONFIG_PATH, generateConfig(cfg), 'utf-8');
+    logSuccess('Generated ~/.cyplex/config.yaml');
 
-    // Write .env file with API keys
-    const envContent = generateEnvFile(cfg);
-    fs.writeFileSync(ENV_PATH, envContent, 'utf-8');
-    success('Generated ~/.cyplex/.env');
+    fs.writeFileSync(ENV_PATH, generateEnvFile(cfg), 'utf-8');
+    logSuccess('Generated ~/.cyplex/.env');
 
-    // Mark setup as complete
     fs.writeFileSync(SETUP_MARKER, new Date().toISOString(), 'utf-8');
 
     // ── Summary ──────────────────────────────────────────────────────────
 
-    header('Setup Complete');
-    console.log(`  ${GREEN}Agent Cyplex is ready.${NC}`);
-    console.log('');
-    console.log(`  ${BOLD}Configuration:${NC}  ~/.cyplex/config.yaml`);
-    console.log(`  ${BOLD}Environment:${NC}    ~/.cyplex/.env`);
-    console.log(`  ${BOLD}Keystore:${NC}       ~/.cyplex/keystore.enc`);
-    console.log(`  ${BOLD}Audit logs:${NC}     ~/.cyplex/audit/`);
-    console.log(`  ${BOLD}Workspaces:${NC}     ~/.cyplex/workspaces/`);
-    console.log('');
-
     const providerCount = Object.keys(cloudKeys).length + (localAi.useLocalAi ? 2 : 0);
     const botCount = [bots.enableTelegram, bots.enableDiscord, bots.enableWhatsapp].filter(Boolean).length;
 
-    console.log(`  ${CYAN}Providers:${NC}  ${providerCount} configured`);
-    console.log(`  ${CYAN}Bots:${NC}       ${botCount} enabled`);
-    console.log(`  ${CYAN}Log level:${NC}  ${daemon.logLevel}`);
     console.log('');
-    console.log(`  ${BOLD}Quick start:${NC}`);
-    console.log(`    ${DIM}$${NC} agent-cyplex daemon start   ${DIM}# Start background daemon${NC}`);
-    console.log(`    ${DIM}$${NC} agent-cyplex                 ${DIM}# Launch interactive REPL${NC}`);
-    console.log('');
-    console.log(`  ${DIM}Re-run setup anytime: agent-cyplex setup${NC}`);
-    console.log(`  ${DIM}Edit config manually: agent-cyplex config edit${NC}`);
+    console.log(boxLine([
+      `${x.brightGreen}${x.bold}Setup Complete${x.reset}`,
+      ``,
+      `${x.bold}${x.white}Files${x.reset}`,
+      `  ${x.teal}Config${x.reset}     ${x.dim}~/.cyplex/config.yaml${x.reset}`,
+      `  ${x.teal}Env${x.reset}        ${x.dim}~/.cyplex/.env${x.reset}`,
+      `  ${x.teal}Keystore${x.reset}   ${x.dim}~/.cyplex/keystore.enc${x.reset}`,
+      `  ${x.teal}Logs${x.reset}       ${x.dim}~/.cyplex/audit/${x.reset}`,
+      ``,
+      `${x.bold}${x.white}Stats${x.reset}`,
+      `  ${x.cyan}Providers${x.reset}  ${x.white}${providerCount}${x.reset} ${x.dim}configured${x.reset}`,
+      `  ${x.cyan}Bots${x.reset}       ${x.white}${botCount}${x.reset} ${x.dim}enabled${x.reset}`,
+      `  ${x.cyan}Log level${x.reset}  ${x.white}${daemon.logLevel}${x.reset}`,
+      ``,
+      `${x.bold}${x.white}Quick Start${x.reset}`,
+      `  ${x.dim}$${x.reset} ${x.white}agent-cyplex daemon start${x.reset}  ${x.dim}Start daemon${x.reset}`,
+      `  ${x.dim}$${x.reset} ${x.white}agent-cyplex${x.reset}               ${x.dim}Launch REPL${x.reset}`,
+    ], x.green));
     console.log('');
 
   } finally {
