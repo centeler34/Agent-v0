@@ -43,7 +43,7 @@ export class OpenAIAdapter implements ModelClient {
     const response = await this.client.chat.completions.create({
       model,
       messages,
-      max_tokens: request.max_tokens,
+      max_completion_tokens: request.max_tokens,
       temperature: request.temperature,
       stream: false,
     });
@@ -80,7 +80,7 @@ export class OpenAIAdapter implements ModelClient {
     const stream = await this.client.chat.completions.create({
       model,
       messages,
-      max_tokens: request.max_tokens,
+      max_completion_tokens: request.max_tokens,
       temperature: request.temperature,
       stream: true,
     });
