@@ -547,9 +547,12 @@ ANTHROPIC_API_KEY=${cfg.keys['anthropic_api_key'] || ''}
 OPENAI_API_KEY=${cfg.keys['openai_api_key'] || ''}
 GOOGLE_AI_API_KEY=${cfg.keys['google_ai_api_key'] || ''}
 
-# ── Local AI Backend Endpoints ─────────────────────────────────────────────
+# ── Local AI Backend ───────────────────────────────────────────────────────
+LOCAL_AI_PROVIDER=${cfg.useLocalAi ? (cfg.lmstudioModel ? 'lmstudio' : 'ollama') : ''}
 OLLAMA_BASE_URL=${cfg.ollamaUrl || 'http://localhost:11434'}
+OLLAMA_MODEL=${cfg.ollamaModel || ''}
 LMSTUDIO_BASE_URL=${cfg.lmstudioUrl || 'http://127.0.0.1:1234'}
+LMSTUDIO_MODEL=${cfg.lmstudioModel || ''}
 
 # ── Bot Tokens ─────────────────────────────────────────────────────────────
 TELEGRAM_BOT_TOKEN=${cfg.keys['telegram_bot_token'] || ''}
