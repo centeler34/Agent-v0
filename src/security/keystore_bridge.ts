@@ -4,6 +4,7 @@
  */
 
 import crypto from 'node:crypto';
+import { randomUUID } from 'node:crypto'; // Added for randomUUID
 import fs from 'node:fs';
 
 interface KeyEntry {

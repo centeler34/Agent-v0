@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
+import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 import { TaskRegistry } from '../orchestrator/task_registry.js';
 import { KeystoreBridge } from '../security/keystore_bridge.js';
 

@@ -1,6 +1,7 @@
 /**
  * Strip secrets from any object before logging.
  */
+import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 
 const SECRET_KEY_PATTERNS = [
   /key/i,

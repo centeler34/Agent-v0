@@ -2,6 +2,7 @@
  * `cyplex audit` subcommands.
  */
 
+import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 import type { Command } from 'commander';
 import path from 'node:path';
 import { AuditBridge } from '../../security/audit_bridge.js';

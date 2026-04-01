@@ -2,6 +2,7 @@
  * `cyplex task` subcommands.
  */
 
+import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 import type { Command } from 'commander';
 import { sendIpcMessage } from '../ipc_client.js';
 

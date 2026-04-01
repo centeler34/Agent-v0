@@ -7,6 +7,7 @@ import path from 'node:path';
 import { TaskRegistry } from '../../orchestrator/task_registry.js';
 import { KeystoreBridge } from '../../security/keystore_bridge.js'; // Still needed to open keystore.enc for master key
 import os from 'node:os';
+import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 import fs from 'node:fs';
 
 const KEYSTORE_PATH = path.join(os.homedir(), '.agent-v0', 'keystore.enc');

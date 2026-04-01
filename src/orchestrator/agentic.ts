@@ -1,6 +1,7 @@
 /**
  * Agentic — Top-level orchestrator.
- * Receives user intent, decomposes into subtasks, delegates to subordinate agents,
+ * Receives user intent, decomposes into subtasks, delegates to subordinate agents, 
+ * Receives user intent, decomposes into subtasks, delegates to subordinate agents, 
  * and synthesizes results.
  */
 
@@ -28,6 +29,7 @@ export interface AgenticConfig {
 }
 
 type AgentDispatcher = (agentId: string, task: TaskEnvelope) => Promise<ResultEnvelope>;
+export type OutputHandler = (taskId: string, agentId: string, text: string) => void;
 
 export class Agentic {
   private config: AgenticConfig;
@@ -37,6 +39,7 @@ export class Agentic {
   private intentParser: IntentParser;
   private dispatcher: AgentDispatcher | null = null;
   private gateway: GatewayRouter | null = null;
+  private outputHandler: OutputHandler | null = null;
 
   constructor(config: AgenticConfig) {
     this.config = config;
@@ -52,6 +55,22 @@ export class Agentic {
 
   setGateway(gateway: GatewayRouter): void {
     this.gateway = gateway;
+  }
+
+  /**
+   * Sets a callback for real-time task output.
+   */
+  onTaskOutput(handler: OutputHandler): void {
+    this.outputHandler = handler;
+  }
+
+  /**
+   * Relays output from a subordinate agent back to the orchestrator.
+   */
+  emitOutput(taskId: string, agentId: string, text: string): void {
+    if (this.outputHandler) {
+      this.outputHandler(taskId, agentId, text);
+    }
   }
 
   /**
