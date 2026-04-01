@@ -1,6 +1,13 @@
 {
-  "name": "agent-v0",
-  "version": "1.0.0",
+  "name": "@centeler34/agent-v0",
+  "version": "1.2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/centeler34/Agent-v0.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "description": "Multi-agent AI orchestration CLI terminal for security researchers (Agent v0)",
   "type": "module",
   "main": "dist/cli/cli.js",
@@ -28,7 +35,6 @@
     "openai": "^6.33.0",
     "p-queue": "^9.1.0",
     "react": "^19.2.4",
-    "ssh2": "^1.17.0",
     "winston": "^3.19.0",
     "yaml": "^2.8.3",
     "zod": "^3.25.67"
@@ -37,7 +43,6 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.0",
     "@types/react": "^19.2.14",
-    "@types/ssh2": "^1.15.5",
     "eslint": "^9.28.0",
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",
