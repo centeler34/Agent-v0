@@ -8,6 +8,7 @@ import { Server } from 'socket.io';
 import path from 'node:path';
 import net from 'node:net';
 import fs from 'node:fs';
+import { execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { TaskRegistry } from './task_registry.js';
 import { KeystoreBridge } from '../security/keystore_bridge.js';
@@ -19,9 +20,22 @@ app.disable('etag');
 app.set('trust proxy', false);
 
 const certDir = path.join(os.homedir(), '.agent-v0', 'certs');
+const keyPath = path.join(certDir, 'server.key');
+const certPath = path.join(certDir, 'server.crt');
+
+if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+  console.log('  TLS certificates not found. Generating self-signed cert...');
+  fs.mkdirSync(certDir, { recursive: true });
+  execSync(
+    `openssl req -x509 -newkey rsa:2048 -nodes -out "${certPath}" -keyout "${keyPath}" -days 365 -subj "/CN=localhost"`,
+    { stdio: 'pipe' },
+  );
+  console.log('  Self-signed certificate generated.');
+}
+
 const tlsOptions = {
-  key: fs.readFileSync(path.join(certDir, 'server.key')),
-  cert: fs.readFileSync(path.join(certDir, 'server.crt')),
+  key: fs.readFileSync(keyPath),
+  cert: fs.readFileSync(certPath),
 };
 
 const httpsServer = createServer(tlsOptions, app);

@@ -4,7 +4,6 @@
  */
 
 import crypto from 'node:crypto';
-import { randomUUID } from 'node:crypto'; // Added for randomUUID
 import fs from 'node:fs';
 
 interface KeyEntry {
@@ -56,8 +55,12 @@ export class KeystoreBridge {
     return this.derivedKey;
   }
 
+  private static SAFE_KEY_NAME = /^[a-zA-Z0-9._-]+$/;
+
   get(name: string): string | null {
     if (!this.data || !this.derivedKey) return null;
+    if (!KeystoreBridge.SAFE_KEY_NAME.test(name)) return null;
+    if (!Object.prototype.hasOwnProperty.call(this.data.entries, name)) return null;
     const entry = this.data.entries[name];
     if (!entry) return null;
 
@@ -66,6 +69,7 @@ export class KeystoreBridge {
 
   set(name: string, value: string): void {
     if (!this.data || !this.derivedKey) throw new Error('Keystore not open');
+    if (!KeystoreBridge.SAFE_KEY_NAME.test(name)) throw new Error(`Invalid key name: "${name}"`);
 
     const encrypted = this.encrypt(value, this.derivedKey);
     this.data.entries[name] = {
@@ -96,7 +100,7 @@ export class KeystoreBridge {
   }
 
   private deriveKey(password: string, salt: string): Buffer {
-    return crypto.scryptSync(password, salt, 32, { N: 16384, r: 8, p: 1 });
+    return crypto.scryptSync(password, salt, 32, { N: 65536, r: 8, p: 1 });
   }
 
   private encrypt(plaintext: string, key: Buffer): string {

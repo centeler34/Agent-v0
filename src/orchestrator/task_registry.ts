@@ -86,13 +86,12 @@ export class TaskRegistry {
         let encryptedTask = row.task_data;
         let encryptedResult = row.result_data;
 
-        // Detect if data is already encrypted by format iv:tag:data
-        if (row.task_data && row.task_data.split(':').length !== 3) {
+        if (row.task_data && !this.isEncrypted(row.task_data)) {
           encryptedTask = this.encrypt(row.task_data);
           needsUpdate = true;
         }
 
-        if (row.result_data && row.result_data.split(':').length !== 3) {
+        if (row.result_data && !this.isEncrypted(row.result_data)) {
           encryptedResult = this.encrypt(row.result_data);
           needsUpdate = true;
         }
@@ -271,41 +270,47 @@ export class TaskRegistry {
   // ── Encryption Helpers ───────────────────────────────────────────────────
 
   private encrypt(plaintext: string): string {
-    if (!this.masterKey) return plaintext; // Fallback to plaintext if key not set (warning: insecure)
+    if (!this.masterKey) {
+      throw new Error('Master key required for encryption — call setMasterKey() first');
+    }
 
     const iv = crypto.randomBytes(12); // Standard 96-bit IV for GCM
     const cipher = crypto.createCipheriv('aes-256-gcm', this.masterKey, iv);
-    
+
     let encrypted = cipher.update(plaintext, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     const tag = cipher.getAuthTag().toString('hex');
 
     // Format: iv:tag:encrypted_data
     return `${iv.toString('hex')}:${tag}:${encrypted}`;
   }
 
+  private static ENCRYPTED_FORMAT = /^[a-f0-9]{24}:[a-f0-9]{32}:[a-f0-9]+$/;
+
+  private isEncrypted(value: string): boolean {
+    return TaskRegistry.ENCRYPTED_FORMAT.test(value);
+  }
+
   private decrypt(ciphertext: string): string {
-    if (!this.masterKey) return ciphertext;
-
-    const parts = ciphertext.split(':');
-    if (parts.length !== 3) return ciphertext; // Likely not encrypted
-
-    const [ivHex, tagHex, dataHex] = parts;
-    
-    try {
-      const iv = Buffer.from(ivHex, 'hex');
-      const tag = Buffer.from(tagHex, 'hex');
-      const decipher = crypto.createDecipheriv('aes-256-gcm', this.masterKey, iv);
-      
-      decipher.setAuthTag(tag);
-      
-      let decrypted = decipher.update(dataHex, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
-      return decrypted;
-    } catch (err) {
-      console.error('Failed to decrypt task data. Master key may be incorrect.');
-      return ciphertext;
+    if (!this.masterKey) {
+      throw new Error('Master key required for decryption — call setMasterKey() first');
     }
+
+    if (!this.isEncrypted(ciphertext)) {
+      throw new Error('Data does not match encrypted format — possible corruption or unencrypted data');
+    }
+
+    const [ivHex, tagHex, dataHex] = ciphertext.split(':');
+
+    const iv = Buffer.from(ivHex, 'hex');
+    const tag = Buffer.from(tagHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', this.masterKey, iv);
+
+    decipher.setAuthTag(tag);
+
+    let decrypted = decipher.update(dataHex, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
   }
 }

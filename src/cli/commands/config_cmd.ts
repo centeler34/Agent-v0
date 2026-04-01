@@ -2,7 +2,6 @@
  * `cyplex config` subcommands.
  */
 
-import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 import type { Command } from 'commander';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,10 +31,10 @@ export function registerConfigCommands(program: Command): void {
   });
 
   config.command('edit').description('Open config in $EDITOR').action(async () => {
-    const editor = process.env.EDITOR || 'vi';
+    const editor = process.env.EDITOR || 'nano';
     // Validate editor is a simple command name to prevent command injection (CWE-78)
-    if (!/^[a-zA-Z0-9_/.-]+$/.test(editor)) {
-      console.error('Invalid $EDITOR value — must be a simple command name');
+    if (!/^[a-zA-Z0-9_-]+$/.test(editor)) {
+      console.error('Invalid $EDITOR value — must be a simple command name (no paths)');
       return;
     }
     const { execFileSync } = await import('node:child_process');
