@@ -27,8 +27,20 @@ export class SessionManager {
   }
 
   create(name: string, scopeFile?: string): Session {
+    // Validate session name to prevent path traversal (CWE-23)
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name)) {
+      throw new Error(`Invalid session name: "${name}". Use only alphanumeric, hyphens, underscores, and dots.`);
+    }
+
     const id = `session-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const workspaceRoot = path.join(this.workspaceBase, name);
+
+    // Verify resolved path stays within workspace base
+    const resolvedRoot = path.resolve(workspaceRoot);
+    const resolvedBase = path.resolve(this.workspaceBase);
+    if (!resolvedRoot.startsWith(resolvedBase + path.sep)) {
+      throw new Error(`Path traversal blocked: session name "${name}" resolves outside workspace`);
+    }
 
     // Create workspace directories
     fs.mkdirSync(workspaceRoot, { recursive: true });

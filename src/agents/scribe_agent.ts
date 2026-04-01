@@ -5,7 +5,7 @@
 import { BaseAgent } from './base_agent.js';
 import type { TaskEnvelope, ResultEnvelope } from '../types/task_envelope.js';
 
-const SYSTEM_PROMPT = `You are the Scribe Agent for Agent Cyplex.
+const SYSTEM_PROMPT = `You are the Scribe Agent for Agent v0.
 Your capabilities include:
 - Organizing research notes into structured knowledge bases
 - Tagging and cross-referencing findings across sessions

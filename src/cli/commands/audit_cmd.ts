@@ -6,7 +6,7 @@ import type { Command } from 'commander';
 import path from 'node:path';
 import { AuditBridge } from '../../security/audit_bridge.js';
 
-const AUDIT_PATH = path.join(process.env.HOME || '~', '.cyplex', 'audit', 'audit.jsonl');
+const AUDIT_PATH = path.join(process.env.HOME || '~', '.agent-v0', 'audit', 'audit.jsonl');
 
 export function registerAuditCommands(program: Command): void {
   const audit = program.command('audit').description('Audit log management');

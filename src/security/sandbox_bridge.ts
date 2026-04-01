@@ -1,5 +1,5 @@
 /**
- * TypeScript FFI bridge to cyplex-sandbox Rust crate.
+ * TypeScript FFI bridge to agent-v0-sandbox Rust crate.
  * MVP: path validation in TS. v1.0: calls into Rust bubblewrap wrapper via napi-rs.
  */
 

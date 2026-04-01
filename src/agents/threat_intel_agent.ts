@@ -5,7 +5,7 @@
 import { BaseAgent } from './base_agent.js';
 import type { TaskEnvelope, ResultEnvelope } from '../types/task_envelope.js';
 
-const SYSTEM_PROMPT = `You are the Threat Intelligence Agent for Agent Cyplex.
+const SYSTEM_PROMPT = `You are the Threat Intelligence Agent for Agent v0.
 Your capabilities include:
 - IOC ingestion, normalization, and deduplication from MISP, OTX, and VirusTotal feeds
 - Threat actor profile maintenance and behavioral pattern analysis

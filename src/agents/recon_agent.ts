@@ -5,7 +5,7 @@
 import { BaseAgent } from './base_agent.js';
 import type { TaskEnvelope, ResultEnvelope } from '../types/task_envelope.js';
 
-const SYSTEM_PROMPT = `You are the Recon Agent for Agent Cyplex, specializing in passive and active reconnaissance.
+const SYSTEM_PROMPT = `You are the Recon Agent for Agent v0, specializing in passive and active reconnaissance.
 Your capabilities include:
 - Subdomain enumeration (certificate transparency, DNS brute force, permutation)
 - DNS record analysis (A, AAAA, CNAME, MX, TXT, SPF, DMARC)

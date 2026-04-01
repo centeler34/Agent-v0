@@ -5,7 +5,7 @@
 import { BaseAgent } from './base_agent.js';
 import type { TaskEnvelope, ResultEnvelope } from '../types/task_envelope.js';
 
-const SYSTEM_PROMPT = `You are the Report Agent for Agent Cyplex.
+const SYSTEM_PROMPT = `You are the Report Agent for Agent v0.
 Your capabilities include:
 - Generating pentest reports in Markdown, PDF-ready, or HTML format
 - Executive summary writing for non-technical audiences

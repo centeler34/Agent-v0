@@ -55,9 +55,10 @@ export class ArtifactApi {
 
     const fullPath = path.join(this.workspaceBase, token.artifact_path);
 
-    // Validate path is within workspace
+    // Validate path is within workspace (CWE-23 mitigation)
+    const resolvedWorkspace = path.resolve(this.workspaceBase);
     const resolved = path.resolve(fullPath);
-    if (!resolved.startsWith(path.resolve(this.workspaceBase))) return null;
+    if (!resolved.startsWith(resolvedWorkspace + path.sep) && resolved !== resolvedWorkspace) return null;
 
     if (!fs.existsSync(fullPath)) return null;
 
@@ -83,7 +84,14 @@ export class ArtifactApi {
    * List artifacts in an agent's workspace.
    */
   listArtifacts(agentId: string): ArtifactRef[] {
+    // Validate agentId to prevent path traversal (CWE-23)
+    if (!/^[a-z][a-z0-9_]*$/.test(agentId)) return [];
+
     const agentDir = path.join(this.workspaceBase, agentId);
+    const resolvedDir = path.resolve(agentDir);
+    const resolvedBase = path.resolve(this.workspaceBase);
+    if (!resolvedDir.startsWith(resolvedBase + path.sep)) return [];
+
     if (!fs.existsSync(agentDir)) return [];
 
     const files = fs.readdirSync(agentDir, { recursive: true }) as string[];

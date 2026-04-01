@@ -4,8 +4,9 @@
 
 import type { Command } from 'commander';
 import { sendIpcMessage } from '../ipc_client.js';
+import { TaskRegistry } from '../../orchestrator/task_registry.js';
 
-export function registerAgentCommands(program: Command): void {
+export function registerAgentCommands(program: Command, p0: TaskRegistry): void {
   const agent = program.command('agent').description('Manage agents');
 
   agent.command('list').description('List all agents').action(async () => {

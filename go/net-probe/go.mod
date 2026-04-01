@@ -1,3 +1,3 @@
 module github.com/agent-v0/agent-v0/net-probe
 
-go 1.24.4
+go 1.26.1

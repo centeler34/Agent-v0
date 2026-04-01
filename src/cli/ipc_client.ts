@@ -10,7 +10,7 @@ interface IpcMessage {
   payload: Record<string, unknown>;
 }
 
-const DEFAULT_SOCKET = '/tmp/cyplex.sock';
+const DEFAULT_SOCKET = '/tmp/agent-v0.sock';
 
 export async function sendIpcMessage(
   message: IpcMessage,

@@ -20,8 +20,8 @@ pub struct BubblewrapConfig {
 
 impl Default for BubblewrapConfig {
     fn default() -> Self {
-        Self {
-            workspace_root: PathBuf::from("/tmp/cyplex-workspace"),
+        Self { // Already correct from previous change
+            workspace_root: PathBuf::from("/tmp/agent-v0-workspace"),
             allowed_binaries: Vec::new(),
             network_access: false,
             readonly_paths: vec![

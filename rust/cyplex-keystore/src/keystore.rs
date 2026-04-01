@@ -162,7 +162,7 @@ mod tests {
         ks.set("api-key", b"sk-secret-12345");
         ks.set("db-password", b"hunter2");
 
-        let dir = std::env::temp_dir().join("cyplex-keystore-test");
+        let dir = std::env::temp_dir().join("agent-v0-keystore-test"); // Already correct from previous change
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("test.keystore");
 

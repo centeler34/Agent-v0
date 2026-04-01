@@ -1,5 +1,5 @@
 /**
- * Agent Cyplex — Uninstaller
+ * Agent v0 — Uninstaller
  * Removes all installed files, config, symlinks, and data.
  */
 
@@ -17,10 +17,10 @@ const DIM = '\x1b[2m';
 const NC = '\x1b[0m';
 
 const HOME = process.env.HOME || '~';
-const INSTALL_DIR = path.join(HOME, '.agent-cyplex');
-const CONFIG_DIR = path.join(HOME, '.cyplex');
-const SYSTEM_BIN = '/usr/local/bin/agent-cyplex';
-const LOCAL_BIN = path.join(HOME, '.local', 'bin', 'agent-cyplex');
+const INSTALL_DIR = path.join(HOME, '.agent-v0');
+const CONFIG_DIR = path.join(HOME, '.agent-v0');
+const SYSTEM_BIN = '/usr/local/bin/agent-v0';
+const LOCAL_BIN = path.join(HOME, '.local', 'bin', 'agent-v0');
 
 function info(text: string): void {
   console.log(`  ${CYAN}[*]${NC} ${text}`);
@@ -41,7 +41,7 @@ function removed(text: string): void {
 export async function runUninstall(): Promise<void> {
   console.log('');
   console.log(`${CYAN}${'─'.repeat(60)}${NC}`);
-  console.log(`${BOLD}  Agent Cyplex — Uninstaller${NC}`);
+  console.log(`${BOLD}  Agent v0 — Uninstaller${NC}`);
   console.log(`${CYAN}${'─'.repeat(60)}${NC}`);
   console.log('');
 
@@ -64,7 +64,7 @@ export async function runUninstall(): Promise<void> {
 
   const hasAnything = toRemove.some(i => i.exists);
   if (!hasAnything) {
-    warn('Nothing to uninstall — Agent Cyplex does not appear to be installed.');
+    warn('Nothing to uninstall — Agent v0 does not appear to be installed.');
     console.log('');
     return;
   }
@@ -88,7 +88,7 @@ export async function runUninstall(): Promise<void> {
 
   // Stop daemon if running
   try {
-    const pidFile = '/tmp/cyplex.pid';
+    const pidFile = '/tmp/agent-v0.pid';
     if (fs.existsSync(pidFile)) {
       const pid = fs.readFileSync(pidFile, 'utf-8').trim();
       info(`Stopping daemon (PID ${pid})...`);
@@ -102,7 +102,7 @@ export async function runUninstall(): Promise<void> {
 
   // Remove socket
   try {
-    const sockPath = '/tmp/cyplex.sock';
+    const sockPath = '/tmp/agent-v0.sock';
     if (fs.existsSync(sockPath)) {
       fs.unlinkSync(sockPath);
       removed('Removed daemon socket');
@@ -144,14 +144,14 @@ export async function runUninstall(): Promise<void> {
 
   // npm unlink if applicable
   try {
-    execSync('npm unlink -g agent-cyplex 2>/dev/null', { stdio: 'pipe' });
+    execSync('npm unlink -g agent-v0 2>/dev/null', { stdio: 'pipe' });
     removed('Removed npm global link');
   } catch { /* not linked */ }
 
   console.log('');
-  success(`${BOLD}Agent Cyplex has been uninstalled.${NC}`);
+  success(`${BOLD}Agent v0 has been uninstalled.${NC}`);
   console.log('');
   console.log(`  ${DIM}To reinstall:${NC}`);
-  console.log(`  ${DIM}curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-Cyplex/main/scripts/install-cyplex.sh | bash${NC}`);
+  console.log(`  ${DIM}curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-v0/main/scripts/install-agent-v0.sh | bash${NC}`); // Already correct from previous change
   console.log('');
 }

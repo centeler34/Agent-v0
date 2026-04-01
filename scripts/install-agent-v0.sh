@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Agent Cyplex — One-Line Installer for Linux
-# Usage: curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-cyplex/main/scripts/install-cyplex.sh | bash
+# Agent v0 — One-Line Installer for Linux
+# Usage: curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-v0/main/scripts/install-agent-v0.sh | bash
 # ============================================================================
 set -euo pipefail
 
@@ -12,21 +12,21 @@ RED='\033[0;31m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-INSTALL_DIR="$HOME/.agent-cyplex"
-BIN_LINK="/usr/local/bin/agent-cyplex"
-REPO_URL="https://github.com/centeler34/Agent-cyplex.git"
+INSTALL_DIR="$HOME/.agent-v0"
+BIN_LINK="/usr/local/bin/agent-v0"
+REPO_URL="https://github.com/centeler34/Agent-v0.git"
 NODE_MIN="20"
 GO_MIN="1.22"
 PYTHON_MIN="3.11"
 
 banner() {
     echo -e "${CYAN}"
-    echo "  ___                    _      ____            _           "
-    echo " / _ \  __ _  ___ _ __ | |_   / ___|_   _ _ __| | _____  __"
-    echo "| |_| |/ _\` |/ _ \ '_ \| __| | |   | | | | '_ \ |/ _ \ \/ /"
-    echo "| | | | (_| |  __/ | | | |_  | |___| |_| | |_) | |  __/>  < "
-    echo "|_| |_|\__, |\___|_| |_|\__|  \____|\__, | .__/|_|\___/_/\_\\"
-    echo "       |___/                         |___/|_|               "
+    echo "  ___                    _            ___  "
+    echo " / _ \  __ _  ___ _ __ | |_  __   __ / _ \ "
+    echo "| |_| |/ _\` |/ _ \ '_ \| __| \ \ / /| | | |"
+    echo "| | | | (_| |  __/ | | | |_   \ V / | |_| |"
+    echo "|_| |_|\__, |\___|_| |_|\__|   \_/   \___/ "
+    echo "       |___/                               "
     echo -e "${NC}"
     echo -e "${BOLD}Multi-Agent AI Orchestration CLI Terminal${NC}"
     echo ""
@@ -191,9 +191,9 @@ clone_repo() {
     if [ -d "$INSTALL_DIR" ]; then
         info "Updating existing installation..."
         cd "$INSTALL_DIR"
-        git pull --ff-only origin main || true
+        git pull --ff-only || true
     else
-        info "Cloning Agent Cyplex..."
+        info "Cloning Agent v0..."
         git clone "$REPO_URL" "$INSTALL_DIR"
         cd "$INSTALL_DIR"
     fi
@@ -216,39 +216,39 @@ build_rust() {
 
 build_go() {
     info "Building Go utilities..."
-    mkdir -p dist
-    (cd go/net-probe && go build -o ../../dist/net-probe .)
+    mkdir -p dist/go
+    (cd go/net-probe && go build -o ../../dist/go/net-probe .)
     success "Go build complete"
 }
 
 install_python_deps() {
     info "Installing Python dependencies..."
-    pip install -r python/forensics-service/requirements.txt --quiet 2>/dev/null || true
-    pip install -r python/osint-utils/requirements.txt --quiet 2>/dev/null || true
+    python3 -m pip install -r python/forensics-service/requirements.txt --quiet 2>/dev/null || true
+    python3 -m pip install -r python/osint-utils/requirements.txt --quiet 2>/dev/null || true
     success "Python dependencies installed"
 }
 
 setup_config() {
     info "Setting up configuration directories..."
-    mkdir -p "$HOME/.cyplex"/{logs,audit,workspaces,sessions}
-    mkdir -p "$HOME/.cyplex/quarantine"/{pending,approved,rejected}
+    mkdir -p "$HOME/.agent-v0"/{logs,audit,workspaces,sessions}
+    mkdir -p "$HOME/.agent-v0/quarantine"/{pending,approved,rejected}
 
-    if [ ! -f "$HOME/.cyplex/config.yaml" ]; then
-        cp config/config.example.yaml "$HOME/.cyplex/config.yaml"
-        success "Default config created at ~/.cyplex/config.yaml"
+    if [ ! -f "$HOME/.agent-v0/config.yaml" ]; then
+        cp config/config.example.yaml "$HOME/.agent-v0/config.yaml"
+        success "Default config created at ~/.agent-v0/config.yaml"
     else
-        warn "Config already exists at ~/.cyplex/config.yaml — skipping"
+        warn "Config already exists at ~/.agent-v0/config.yaml — skipping"
     fi
 
 }
 
 install_command() {
-    info "Installing 'agent-cyplex' command..."
+    info "Installing 'agent-v0' command..."
 
     # Create wrapper script
-    cat > "$INSTALL_DIR/agent-cyplex" << 'WRAPPER'
+    cat > "$INSTALL_DIR/agent-v0" << 'WRAPPER'
 #!/usr/bin/env bash
-INSTALL_DIR="$HOME/.agent-cyplex"
+INSTALL_DIR="$HOME/.agent-v0"
 export NODE_PATH="$INSTALL_DIR/node_modules"
 
 # Ensure nvm node is available
@@ -261,21 +261,21 @@ export NVM_DIR="$HOME/.nvm"
 
 exec node "$INSTALL_DIR/dist/cli/cli.js" "$@"
 WRAPPER
-    chmod +x "$INSTALL_DIR/agent-cyplex"
+    chmod +x "$INSTALL_DIR/agent-v0"
 
     # Symlink to /usr/local/bin
     if [ -w /usr/local/bin ] || sudo -n true 2>/dev/null; then
-        sudo ln -sf "$INSTALL_DIR/agent-cyplex" "$BIN_LINK"
-        success "'agent-cyplex' installed to $BIN_LINK"
+        sudo ln -sf "$INSTALL_DIR/agent-v0" "$BIN_LINK"
+        success "'agent-v0' installed to $BIN_LINK"
     else
         # Fallback: add to user's local bin
         mkdir -p "$HOME/.local/bin"
-        ln -sf "$INSTALL_DIR/agent-cyplex" "$HOME/.local/bin/agent-cyplex"
+        ln -sf "$INSTALL_DIR/agent-v0" "$HOME/.local/bin/agent-v0"
         if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
             echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
             warn "Added ~/.local/bin to PATH in ~/.bashrc — restart your shell or run: source ~/.bashrc"
         fi
-        success "'agent-cyplex' installed to ~/.local/bin/agent-cyplex"
+        success "'agent-v0' installed to ~/.local/bin/agent-v0"
     fi
 }
 
@@ -285,7 +285,7 @@ WRAPPER
 main() {
     banner
 
-    info "Starting Agent Cyplex installation..."
+    info "Starting Agent v0 installation..."
     echo ""
 
     # Phase 1: System dependencies
@@ -325,10 +325,10 @@ main() {
     echo ""
 
     echo -e "${GREEN}${BOLD}============================================${NC}"
-    echo -e "${GREEN}${BOLD}  Agent Cyplex installed successfully!${NC}"
+    echo -e "${GREEN}${BOLD}  Agent v0 installed successfully!${NC}"
     echo -e "${GREEN}${BOLD}============================================${NC}"
     echo ""
-    echo -e "  Run ${BOLD}agent-cyplex${NC} to launch the setup wizard and configure your API keys."
+    echo -e "  Run ${BOLD}agent-v0${NC} to launch the setup wizard and configure your API keys."
     echo ""
     echo -e "  The setup wizard will walk you through:"
     echo -e "    ${CYAN}1.${NC} Master password for encrypted keystore"
@@ -336,7 +336,7 @@ main() {
     echo -e "    ${CYAN}3.${NC} Bot integrations (Telegram, Discord, WhatsApp)"
     echo -e "    ${CYAN}4.${NC} Daemon & security settings"
     echo ""
-    echo -e "  After setup, use ${BOLD}agent-cyplex daemon start${NC} to start the daemon."
+    echo -e "  After setup, use ${BOLD}agent-v0 daemon start${NC} to start the daemon."
     echo ""
 }
 

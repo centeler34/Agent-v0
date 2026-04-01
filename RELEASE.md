@@ -42,7 +42,7 @@ The `go/ssh-tunnel` module has been completely removed. This module was original
 
 - Removed `SshTunnelConfig` interface from `src/types/provider_config.ts`
 - Removed `ssh_tunnel` field from `ProviderConfig`
-- Removed SSH tunnel build steps from `Makefile`, `scripts/build-go.sh`, `scripts/install.sh`, `scripts/install-cyplex.sh`, and `src/cli/updater.ts`
+- Removed SSH tunnel build steps from `Makefile`, `scripts/build-go.sh`, `scripts/install.sh`, `scripts/install-agent-v0.sh`, and `src/cli/updater.ts`
 
 ---
 

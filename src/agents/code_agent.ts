@@ -5,7 +5,7 @@
 import { BaseAgent } from './base_agent.js';
 import type { TaskEnvelope, ResultEnvelope } from '../types/task_envelope.js';
 
-const SYSTEM_PROMPT = `You are the Code Agent for Agent Cyplex, specializing in security-focused code analysis.
+const SYSTEM_PROMPT = `You are the Code Agent for Agent v0, specializing in security-focused code analysis and universal automation.
 Your capabilities include:
 - Static analysis for security vulnerabilities (injection, auth bypasses, logic flaws)
 - PoC exploit generation in Python, Go, or Bash

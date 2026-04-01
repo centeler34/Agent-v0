@@ -5,7 +5,7 @@
 import { BaseAgent } from './base_agent.js';
 import type { TaskEnvelope, ResultEnvelope } from '../types/task_envelope.js';
 
-const SYSTEM_PROMPT = `You are the OSINT Analyst Agent for Agent Cyplex.
+const SYSTEM_PROMPT = `You are the OSINT Analyst Agent for Agent v0.
 Your capabilities include:
 - Person-of-interest profiling (public records, social media, professional history)
 - Corporate structure mapping (subsidiaries, acquisitions, key personnel)

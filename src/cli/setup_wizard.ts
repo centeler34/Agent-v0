@@ -1,5 +1,5 @@
 /**
- * Agent Cyplex — First-Run Setup Wizard
+ * Agent v0 — First-Run Setup Wizard
  * Interactive terminal setup that runs on first launch.
  * Configures API keys, bot tokens, and daemon settings.
  */
@@ -7,14 +7,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
+import { TaskRegistry } from '../orchestrator/task_registry.js';
 import { KeystoreBridge } from '../security/keystore_bridge.js';
 
 const HOME = process.env.HOME || process.env.USERPROFILE || '~';
-const CYPLEX_DIR = path.join(HOME, '.cyplex');
-const CONFIG_PATH = path.join(CYPLEX_DIR, 'config.yaml');
-const KEYSTORE_PATH = path.join(CYPLEX_DIR, 'keystore.enc');
-const SETUP_MARKER = path.join(CYPLEX_DIR, '.setup-complete');
-const ENV_PATH = path.join(CYPLEX_DIR, '.env');
+const AGENT_DIR = path.join(HOME, '.agent-v0');
+const CONFIG_PATH = path.join(AGENT_DIR, 'config.yaml');
+const KEYSTORE_PATH = path.join(AGENT_DIR, 'keystore.enc');
+const SETUP_MARKER = path.join(AGENT_DIR, '.setup-complete');
+const ENV_PATH = path.join(AGENT_DIR, '.env');
 
 // ── ANSI Palette ─────────────────────────────────────────────────────────────
 
@@ -192,24 +193,24 @@ function printWizardBanner(): void {
   console.log(`  ${x.blue}${x.bold} ╚██████╗   ██║   ██║     ███████╗███████╗██╔╝ ██╗${x.reset}`);
   console.log(`  ${x.blue}${x.bold}  ╚═════╝   ╚═╝   ╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝${x.reset}`);
   console.log('');
-  console.log(`  ${x.bold}${x.white}  Setup Wizard${x.reset}  ${x.dim}v0.2.0${x.reset}`);
+  console.log(`  ${x.bold}${x.white}  Setup Wizard${x.reset}  ${x.dim}v1.0.0${x.reset}`);
   console.log(`  ${x.dim}  First-time configuration${x.reset}`);
   console.log('');
 }
 
 async function stepWelcome(rl: readline.Interface): Promise<void> {
   console.log(boxLine([
-    `${x.bold}${x.white}Welcome to Agent Cyplex${x.reset}`,
+    `${x.bold}${x.white}Welcome to Agent v0${x.reset}`,
     `${x.dim}Multi-Agent AI Orchestration Terminal${x.reset}`,
     ``,
-    `${x.white}This wizard configures:${x.reset}`,
+    `${x.white}This wizard sets up your personal AI hub:${x.reset}`,
     ``,
     `  ${x.brightCyan}01${x.reset}  ${x.white}Master password${x.reset}     ${x.dim}AES-256 encrypted keystore${x.reset}`,
     `  ${x.brightCyan}02${x.reset}  ${x.white}Cloud AI providers${x.reset}  ${x.dim}Anthropic, OpenAI, Gemini${x.reset}`,
     `  ${x.brightCyan}03${x.reset}  ${x.white}Bot integrations${x.reset}    ${x.dim}Telegram, Discord, WhatsApp${x.reset}`,
     `  ${x.brightCyan}04${x.reset}  ${x.white}Daemon settings${x.reset}     ${x.dim}Logging, socket config${x.reset}`,
     ``,
-    `${x.dim}Re-run anytime: ${x.white}agent-cyplex setup${x.reset}`,
+    `${x.dim}Re-run anytime: ${x.white}agent-v0 setup${x.reset}`,
   ]));
   console.log('');
   await ask(rl, `Press ${x.bold}Enter${x.reset} to begin`);
@@ -359,7 +360,7 @@ async function stepDaemon(rl: readline.Interface): Promise<{ logLevel: string; s
   const logLevel = ['debug', 'info', 'warn', 'error'][logIdx];
   console.log('');
 
-  const socketPath = await ask(rl, 'Daemon socket path', '/tmp/cyplex.sock');
+  const socketPath = await ask(rl, 'Daemon socket path', '/tmp/agent-v0.sock');
   console.log('');
 
   return { logLevel, socketPath };
@@ -368,18 +369,18 @@ async function stepDaemon(rl: readline.Interface): Promise<{ logLevel: string; s
 // ── Config Generation ────────────────────────────────────────────────────────
 
 function generateConfig(cfg: SetupConfig): string {
-  return `cyplex:
-  version: "1.0"
+  return `agent-v0:
+  version: "1.0.0"
 
   daemon:
-    socket_path: "${cfg.socketPath}"
-    pid_file: "/tmp/cyplex.pid"
+    socket_path: "/tmp/agent-v0.sock"
+    pid_file: "/tmp/agent-v0.pid"
     heartbeat_interval_ms: 5000
     log_level: "${cfg.daemonLogLevel}"
-    log_path: "~/.cyplex/logs/"
+    log_path: "~/.agent-v0/logs/"
 
   sessions:
-    default_workspace_root: "~/.cyplex/workspaces/"
+    default_workspace_root: "~/.agent-v0/workspaces/"
     auto_archive_after_days: 90
 
   gateway:
@@ -404,6 +405,8 @@ ${cfg.keys['google_ai_api_key'] ? `      gemini:
       #   model: "gemini-pro"
       #   key_ref: "google_ai_api_key"`}
 
+  # Agent Fleet Configuration
+  # You can add as many specialized agents as you desire.
   agents:
     agentic:
       enabled: true
@@ -465,8 +468,8 @@ ${cfg.keys['google_ai_api_key'] ? `      gemini:
       enabled: ${cfg.enableWhatsapp}
 
   security:
-    audit_log_path: "~/.cyplex/audit/audit.jsonl"
-    keystore_path: "~/.cyplex/keystore.enc"
+    audit_log_path: "~/.agent-v0/audit/audit.jsonl"
+    keystore_path: "~/.agent-v0/keystore.enc"
     kdf: "argon2id"
     session_token_ttl_hours: 24
     skill_signature_verification: true
@@ -480,7 +483,7 @@ ${cfg.keys['google_ai_api_key'] ? `      gemini:
 
 function generateEnvFile(cfg: SetupConfig): string {
   return `# ============================================================================
-# Agent Cyplex — Environment Configuration
+# Agent v0 — Environment Configuration
 # Auto-generated by setup wizard. Do not commit to version control.
 # ============================================================================
 
@@ -494,8 +497,8 @@ TELEGRAM_BOT_TOKEN=${cfg.keys['telegram_bot_token'] || ''}
 DISCORD_BOT_TOKEN=${cfg.keys['discord_bot_token'] || ''}
 
 # ── Daemon Settings ────────────────────────────────────────────────────────
-CYPLEX_SOCKET_PATH=${cfg.socketPath}
-CYPLEX_LOG_LEVEL=${cfg.daemonLogLevel}
+AGENT_V0_SOCKET_PATH=${cfg.socketPath}
+AGENT_V0_LOG_LEVEL=${cfg.daemonLogLevel}
 `;
 }
 
@@ -527,29 +530,32 @@ export async function runSetupWizard(): Promise<void> {
 
     // Create directories
     const dirs = [
-      CYPLEX_DIR,
-      path.join(CYPLEX_DIR, 'logs'),
-      path.join(CYPLEX_DIR, 'audit'),
-      path.join(CYPLEX_DIR, 'workspaces'),
-      path.join(CYPLEX_DIR, 'sessions'),
-      path.join(CYPLEX_DIR, 'quarantine', 'pending'),
-      path.join(CYPLEX_DIR, 'quarantine', 'approved'),
-      path.join(CYPLEX_DIR, 'quarantine', 'rejected'),
+      AGENT_DIR,
+      path.join(AGENT_DIR, 'logs'),
+      path.join(AGENT_DIR, 'audit'),
+      path.join(AGENT_DIR, 'workspaces'),
+      path.join(AGENT_DIR, 'sessions'),
+      path.join(AGENT_DIR, 'quarantine', 'pending'),
+      path.join(AGENT_DIR, 'quarantine', 'approved'),
+      path.join(AGENT_DIR, 'quarantine', 'rejected'),
     ];
     for (const dir of dirs) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    logSuccess('Created ~/.cyplex/ directory structure');
+    logSuccess('Created ~/.agent-v0/ directory structure');
 
     // Save keys to encrypted keystore
     const allKeys = { ...cloudKeys, ...bots.botKeys };
     if (Object.keys(allKeys).length > 0) {
       const keystore = new KeystoreBridge();
+      // Open keystore to get the derived master key
       await keystore.open(KEYSTORE_PATH, masterPassword);
+      const masterKey = keystore.getDerivedKey();
+      const registry = new TaskRegistry();
+      registry.setMasterKey(masterKey);
       for (const [name, value] of Object.entries(allKeys)) {
-        if (value) keystore.set(name, value);
+        if (value) registry.setSecret(name, value);
       }
-      keystore.save(KEYSTORE_PATH);
       logSuccess(`Saved ${Object.keys(allKeys).length} key(s) to encrypted keystore`);
     }
 
@@ -568,11 +574,13 @@ export async function runSetupWizard(): Promise<void> {
       socketPath: daemon.socketPath,
     };
 
-    fs.writeFileSync(CONFIG_PATH, generateConfig(cfg), 'utf-8');
-    logSuccess('Generated ~/.cyplex/config.yaml');
+    fs.writeFileSync(CONFIG_PATH, generateConfig(cfg), { encoding: 'utf-8', mode: 0o600 });
+    logSuccess('Generated ~/.agent-v0/config.yaml');
 
-    fs.writeFileSync(ENV_PATH, generateEnvFile(cfg), 'utf-8');
-    logSuccess('Generated ~/.cyplex/.env');
+    // Write .env with restrictive permissions — contains API keys (CWE-732)
+    // No longer storing secrets in .env, only daemon settings
+    fs.writeFileSync(ENV_PATH, generateEnvFile(cfg), { encoding: 'utf-8', mode: 0o600 }); // Still write for daemon settings
+    logSuccess('Generated ~/.agent-v0/.env (daemon settings only)');
 
     fs.writeFileSync(SETUP_MARKER, new Date().toISOString(), 'utf-8');
 
@@ -586,10 +594,10 @@ export async function runSetupWizard(): Promise<void> {
       `${x.brightGreen}${x.bold}Setup Complete${x.reset}`,
       ``,
       `${x.bold}${x.white}Files${x.reset}`,
-      `  ${x.teal}Config${x.reset}     ${x.dim}~/.cyplex/config.yaml${x.reset}`,
-      `  ${x.teal}Env${x.reset}        ${x.dim}~/.cyplex/.env${x.reset}`,
-      `  ${x.teal}Keystore${x.reset}   ${x.dim}~/.cyplex/keystore.enc${x.reset}`,
-      `  ${x.teal}Logs${x.reset}       ${x.dim}~/.cyplex/audit/${x.reset}`,
+      `  ${x.teal}Config${x.reset}     ${x.dim}~/.agent-v0/config.yaml${x.reset}`,
+      `  ${x.teal}Env${x.reset}        ${x.dim}~/.agent-v0/.env${x.reset}`,
+      `  ${x.teal}Keystore${x.reset}   ${x.dim}~/.agent-v0/keystore.enc${x.reset}`,
+      `  ${x.teal}Logs${x.reset}       ${x.dim}~/.agent-v0/audit/${x.reset}`,
       ``,
       `${x.bold}${x.white}Stats${x.reset}`,
       `  ${x.cyan}Providers${x.reset}  ${x.white}${providerCount}${x.reset} ${x.dim}configured${x.reset}`,
@@ -597,8 +605,8 @@ export async function runSetupWizard(): Promise<void> {
       `  ${x.cyan}Log level${x.reset}  ${x.white}${daemon.logLevel}${x.reset}`,
       ``,
       `${x.bold}${x.white}Quick Start${x.reset}`,
-      `  ${x.dim}$${x.reset} ${x.white}agent-cyplex daemon start${x.reset}  ${x.dim}Start daemon${x.reset}`,
-      `  ${x.dim}$${x.reset} ${x.white}agent-cyplex${x.reset}               ${x.dim}Launch REPL${x.reset}`,
+      `  ${x.dim}$${x.reset} ${x.white}agent-v0 daemon start${x.reset}  ${x.dim}Start daemon${x.reset}`,
+      `  ${x.dim}$${x.reset} ${x.white}agent-v0${x.reset}               ${x.dim}Launch REPL${x.reset}`,
     ], x.green));
     console.log('');
 

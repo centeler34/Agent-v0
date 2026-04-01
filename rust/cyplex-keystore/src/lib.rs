@@ -1,6 +1,6 @@
 //! # cyplex-keystore
 //!
-//! Encrypted secret storage engine for Agent Cyplex.
+//! Encrypted secret storage engine for Agent v0.
 //!
 //! Secrets are encrypted at rest with AES-256-GCM and the master key is derived
 //! from a password via Argon2id.

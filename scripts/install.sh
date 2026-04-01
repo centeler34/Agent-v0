@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Agent Cyplex Installer ==="
+echo "=== Agent v0 Installer ==="
 echo ""
 
-# Detect OS
+# Detect OS and Architecture
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 echo "Detected: $OS $ARCH"
@@ -49,7 +49,7 @@ cargo build --release
 
 echo ""
 echo "Building Go binaries..."
-cd go/net-probe && go build -o ../../dist/net-probe . && cd ../..
+mkdir -p dist/go && cd go/net-probe && go build -o ../../dist/go/net-probe . && cd ../..
 
 echo ""
 echo "Installing Python dependencies..."
@@ -62,8 +62,8 @@ npx tsc
 
 echo ""
 echo "Creating config directory..."
-mkdir -p ~/.cyplex/{logs,audit,workspaces,quarantine/{pending,approved,rejected}}
+mkdir -p ~/.agent-v0/{logs,audit,workspaces,quarantine/{pending,approved,rejected}}
 
 echo ""
 echo "=== Installation complete ==="
-echo "Run 'cyplex daemon start' to begin."
+echo "Run 'agent-v0 daemon start' to begin."

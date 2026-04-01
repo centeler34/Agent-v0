@@ -1,6 +1,6 @@
-//! # cyplex-sandbox
+//! # agent-v0-sandbox
 //!
-//! Agent process sandboxing for the Agent Cyplex project.
+//! Agent process sandboxing for the Agent v0 project.
 //!
 //! This crate provides Linux-specific isolation primitives (namespaces,
 //! seccomp-BPF, bubblewrap) together with a platform-independent path guard

@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn write_and_verify_round_trip() {
-        let dir = std::env::temp_dir().join("cyplex_audit_test");
+        let dir = std::env::temp_dir().join("agent_v0_audit_test");
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("test.jsonl");
         let _ = std::fs::remove_file(&path);

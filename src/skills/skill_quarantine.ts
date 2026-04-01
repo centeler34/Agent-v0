@@ -29,6 +29,9 @@ export class SkillQuarantine {
   }
 
   getEntry(hash: string): QuarantineEntry | null {
+    // Validate hash format to prevent path traversal (CWE-23)
+    if (!/^[a-f0-9]{64}$/.test(hash)) return null;
+
     for (const dir of ['pending', 'approved', 'rejected']) {
       const metaPath = path.join(QUARANTINE_BASE, dir, `${hash}.yaml.meta.json`);
       if (fs.existsSync(metaPath)) {
@@ -43,10 +46,12 @@ export class SkillQuarantine {
   }
 
   approve(hash: string): boolean {
+    if (!/^[a-f0-9]{64}$/.test(hash)) return false;
     return this.moveEntry(hash, 'pending', 'approved', { approved_at: new Date().toISOString(), status: 'approved' });
   }
 
   reject(hash: string, reason: string): boolean {
+    if (!/^[a-f0-9]{64}$/.test(hash)) return false;
     return this.moveEntry(hash, 'pending', 'rejected', {
       rejected_at: new Date().toISOString(),
       status: 'rejected',
