@@ -1,4 +1,4 @@
-# [🛡️ Security Architecture & Updates](./Security.md)
+# [Security Architecture & Updates](./Security.md)
 
 # Agent v0
 
