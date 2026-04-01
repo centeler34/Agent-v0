@@ -4,17 +4,6 @@
 
 export type ProviderType = 'anthropic' | 'openai' | 'gemini' | 'mistral';
 
-export interface SshTunnelConfig {
-  enabled: boolean;
-  remote_host: string;
-  remote_port: number;
-  local_port: number;
-  ssh_user: string;
-  ssh_key_path: string;
-  keepalive_interval_s: number;
-  reconnect_on_failure: boolean;
-}
-
 export interface ProviderConfig {
   name: string;
   type: ProviderType;
@@ -23,7 +12,6 @@ export interface ProviderConfig {
   key_ref?: string;
   timeout_ms: number;
   max_retries: number;
-  ssh_tunnel?: SshTunnelConfig;
 }
 
 export interface GatewayConfig {

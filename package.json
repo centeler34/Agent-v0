@@ -1,11 +1,11 @@
 {
-  "name": "agent-cyplex",
-  "version": "0.2.0",
-  "description": "Multi-agent AI orchestration CLI terminal for security researchers",
+  "name": "agent-v0",
+  "version": "1.0.0",
+  "description": "Multi-agent AI orchestration CLI terminal for security researchers (Agent v0)",
   "type": "module",
   "main": "dist/cli/cli.js",
   "bin": {
-    "cyplex": "dist/cli/cli.js"
+    "agent-v0": "dist/cli/cli.js"
   },
   "scripts": {
     "build": "tsc",

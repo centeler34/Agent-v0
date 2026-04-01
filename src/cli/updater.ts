@@ -178,7 +178,6 @@ export async function runUpdate(): Promise<void> {
     try {
       const distDir = path.join(installDir, 'dist');
       if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true });
-      run('go build -o ../../dist/ssh-tunnel .', path.join(installDir, 'go', 'ssh-tunnel'));
       run('go build -o ../../dist/net-probe .', path.join(installDir, 'go', 'net-probe'));
       success('  Go utilities built');
     } catch (e) {

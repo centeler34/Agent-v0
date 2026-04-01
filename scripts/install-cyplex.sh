@@ -217,7 +217,6 @@ build_rust() {
 build_go() {
     info "Building Go utilities..."
     mkdir -p dist
-    (cd go/ssh-tunnel && go build -o ../../dist/ssh-tunnel .)
     (cd go/net-probe && go build -o ../../dist/net-probe .)
     success "Go build complete"
 }

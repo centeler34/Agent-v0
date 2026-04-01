@@ -13,7 +13,6 @@ build-ts:
 	npx tsc
 
 build-go:
-	cd go/ssh-tunnel && go build -o ../../dist/ssh-tunnel .
 	cd go/net-probe && go build -o ../../dist/net-probe .
 
 # ── Development ────────────────────────────────────────────────────
