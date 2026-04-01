@@ -16,7 +16,6 @@ import type {
 import { AnthropicAdapter } from './anthropic_adapter.js';
 import { OpenAIAdapter } from './openai_adapter.js';
 import { GeminiAdapter } from './gemini_adapter.js';
-import { LocalModelAdapter } from './local_model_adapter.js';
 import { RateLimiter } from './rate_limiter.js';
 import { CostTracker, type TokenUsage } from './cost_tracker.js';
 
@@ -213,9 +212,6 @@ export class GatewayRouter {
         return new OpenAIAdapter(config);
       case 'gemini':
         return new GeminiAdapter(config);
-      case 'ollama':
-      case 'lmstudio':
-        return new LocalModelAdapter(config);
       default:
         throw new Error(`Unsupported provider type: ${config.type}`);
     }

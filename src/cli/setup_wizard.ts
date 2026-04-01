@@ -1,7 +1,7 @@
 /**
  * Agent Cyplex — First-Run Setup Wizard
  * Interactive terminal setup that runs on first launch.
- * Configures API keys, local AI backends, bot tokens, and daemon settings.
+ * Configures API keys, bot tokens, and daemon settings.
  */
 
 import fs from 'node:fs';
@@ -70,10 +70,6 @@ function stepHeader(num: number, total: number, title: string): void {
   console.log(`  ${x.darkGray}│${x.reset}  ${x.brightCyan}${x.bold}Step ${num}/${total}${x.reset}  ${x.dim}─${x.reset}  ${x.bold}${x.white}${title}${x.reset}${' '.repeat(Math.max(0, 42 - title.length))}${x.darkGray}│${x.reset}`);
   console.log(`  ${x.darkGray}╰──────────────────────────────────────────────────────────╯${x.reset}`);
   console.log('');
-}
-
-function logInfo(text: string): void {
-  console.log(`    ${x.cyan}●${x.reset} ${text}`);
 }
 
 function logSuccess(text: string): void {
@@ -177,11 +173,6 @@ interface SetupConfig {
   defaultProvider: string;
   fallbackProvider: string;
   keys: Record<string, string>;
-  ollamaUrl: string;
-  ollamaModel: string;
-  lmstudioUrl: string;
-  lmstudioModel: string;
-  useLocalAi: boolean;
   enableTelegram: boolean;
   telegramToken: string;
   enableDiscord: boolean;
@@ -201,7 +192,7 @@ function printWizardBanner(): void {
   console.log(`  ${x.blue}${x.bold} ╚██████╗   ██║   ██║     ███████╗███████╗██╔╝ ██╗${x.reset}`);
   console.log(`  ${x.blue}${x.bold}  ╚═════╝   ╚═╝   ╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝${x.reset}`);
   console.log('');
-  console.log(`  ${x.bold}${x.white}  Setup Wizard${x.reset}  ${x.dim}v0.1.0${x.reset}`);
+  console.log(`  ${x.bold}${x.white}  Setup Wizard${x.reset}  ${x.dim}v0.2.0${x.reset}`);
   console.log(`  ${x.dim}  First-time configuration${x.reset}`);
   console.log('');
 }
@@ -215,9 +206,8 @@ async function stepWelcome(rl: readline.Interface): Promise<void> {
     ``,
     `  ${x.brightCyan}01${x.reset}  ${x.white}Master password${x.reset}     ${x.dim}AES-256 encrypted keystore${x.reset}`,
     `  ${x.brightCyan}02${x.reset}  ${x.white}Cloud AI providers${x.reset}  ${x.dim}Anthropic, OpenAI, Gemini${x.reset}`,
-    `  ${x.brightCyan}03${x.reset}  ${x.white}Local AI backends${x.reset}   ${x.dim}Ollama, LM Studio${x.reset}`,
-    `  ${x.brightCyan}04${x.reset}  ${x.white}Bot integrations${x.reset}    ${x.dim}Telegram, Discord, WhatsApp${x.reset}`,
-    `  ${x.brightCyan}05${x.reset}  ${x.white}Daemon settings${x.reset}     ${x.dim}Logging, socket config${x.reset}`,
+    `  ${x.brightCyan}03${x.reset}  ${x.white}Bot integrations${x.reset}    ${x.dim}Telegram, Discord, WhatsApp${x.reset}`,
+    `  ${x.brightCyan}04${x.reset}  ${x.white}Daemon settings${x.reset}     ${x.dim}Logging, socket config${x.reset}`,
     ``,
     `${x.dim}Re-run anytime: ${x.white}agent-cyplex setup${x.reset}`,
   ]));
@@ -226,7 +216,7 @@ async function stepWelcome(rl: readline.Interface): Promise<void> {
 }
 
 async function stepMasterPassword(rl: readline.Interface): Promise<string> {
-  stepHeader(1, 5, 'Master Password');
+  stepHeader(1, 4, 'Master Password');
   console.log(`    ${x.white}Your master password encrypts all API keys and secrets.${x.reset}`);
   console.log(`    ${x.yellow}Choose a strong password — it cannot be recovered if lost.${x.reset}`);
   console.log('');
@@ -251,7 +241,7 @@ async function stepMasterPassword(rl: readline.Interface): Promise<string> {
 }
 
 async function stepCloudProviders(rl: readline.Interface): Promise<{ keys: Record<string, string>; defaultProvider: string; fallbackProvider: string }> {
-  stepHeader(2, 5, 'Cloud AI Providers');
+  stepHeader(2, 4, 'Cloud AI Providers');
   console.log(`    ${x.white}Configure API keys for cloud AI providers.${x.reset}`);
   console.log(`    ${x.dim}Press Enter to skip any provider you don't use.${x.reset}`);
   console.log('');
@@ -310,98 +300,14 @@ async function stepCloudProviders(rl: readline.Interface): Promise<{ keys: Recor
       fallbackProvider = remaining[fbIdx];
     }
   } else {
-    logWarn('No cloud providers configured — use local AI or add keys later');
+    logWarn('No cloud providers configured — add keys later via setup');
   }
 
   return { keys, defaultProvider, fallbackProvider };
 }
 
-async function fetchModels(baseUrl: string, provider: 'ollama' | 'lmstudio'): Promise<string[]> {
-  try {
-    const base = baseUrl.replace(/\/+$/, '');
-    const url = provider === 'ollama'
-      ? `${base}/api/tags`
-      : `${base}/v1/models`;
-
-    const res = await fetch(url, {
-      method: 'GET',
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!res.ok) return [];
-
-    const data: any = await res.json();
-    const models: string[] = [];
-
-    if (provider === 'ollama' && data.models) {
-      for (const m of data.models) models.push(m.name || m.model);
-    } else if (data.data) {
-      for (const m of data.data) models.push(m.id || m.model);
-    }
-
-    return models;
-  } catch {
-    return [];
-  }
-}
-
-async function stepLocalAi(rl: readline.Interface): Promise<{ useLocalAi: boolean; ollamaUrl: string; ollamaModel: string; lmstudioUrl: string; lmstudioModel: string }> {
-  stepHeader(3, 5, 'Local AI Backends');
-  console.log(`    ${x.white}Run AI models locally with Ollama or LM Studio.${x.reset}`);
-  console.log(`    ${x.dim}No API keys needed — completely offline & private.${x.reset}`);
-  console.log('');
-
-  const useLocalAi = await askYesNo(rl, 'Configure local AI backends?', true);
-  if (!useLocalAi) {
-    return { useLocalAi: false, ollamaUrl: '', ollamaModel: '', lmstudioUrl: '', lmstudioModel: '' };
-  }
-
-  // ── Ollama ──
-  console.log('');
-  console.log(`    ${x.orange}┃${x.reset} ${x.bold}${x.white}Ollama${x.reset}`);
-  const ollamaUrl = await ask(rl, 'Endpoint URL', 'http://localhost:11434');
-  let ollamaModel = '';
-
-  if (ollamaUrl) {
-    logInfo('Connecting to Ollama...');
-    const ollamaModels = await fetchModels(ollamaUrl, 'ollama');
-    if (ollamaModels.length > 0) {
-      logSuccess(`Found ${ollamaModels.length} model(s)`);
-      const idx = await askChoice(rl, 'Select default model:', ollamaModels, 0);
-      ollamaModel = ollamaModels[idx];
-      logSuccess(`Selected: ${x.bold}${ollamaModel}${x.reset}`);
-    } else {
-      logWarn('Could not connect or no models loaded');
-      ollamaModel = await ask(rl, 'Model name (manual)', 'llama3.3');
-    }
-  }
-
-  // ── LM Studio ──
-  console.log('');
-  console.log(`    ${x.teal}┃${x.reset} ${x.bold}${x.white}LM Studio${x.reset}`);
-  const lmstudioUrl = await ask(rl, 'Endpoint URL', 'http://127.0.0.1:1234');
-  let lmstudioModel = '';
-
-  if (lmstudioUrl) {
-    logInfo('Connecting to LM Studio...');
-    const lmModels = await fetchModels(lmstudioUrl, 'lmstudio');
-    if (lmModels.length > 0) {
-      logSuccess(`Found ${lmModels.length} model(s)`);
-      const idx = await askChoice(rl, 'Select default model:', lmModels, 0);
-      lmstudioModel = lmModels[idx];
-      logSuccess(`Selected: ${x.bold}${lmstudioModel}${x.reset}`);
-    } else {
-      logWarn('Could not connect or no models loaded');
-      logWarn('Make sure LM Studio server is running, or re-run setup later');
-      lmstudioModel = await ask(rl, 'Model name (or Enter to skip)', '');
-    }
-  }
-
-  return { useLocalAi, ollamaUrl, ollamaModel, lmstudioUrl, lmstudioModel };
-}
-
 async function stepBots(rl: readline.Interface): Promise<{ enableTelegram: boolean; telegramToken: string; enableDiscord: boolean; discordToken: string; enableWhatsapp: boolean; botKeys: Record<string, string> }> {
-  stepHeader(4, 5, 'Bot Integrations');
+  stepHeader(3, 4, 'Bot Integrations');
   console.log(`    ${x.white}Receive tasks from chat platforms.${x.reset}`);
   console.log(`    ${x.dim}Press Enter to skip any integration.${x.reset}`);
   console.log('');
@@ -438,14 +344,14 @@ async function stepBots(rl: readline.Interface): Promise<{ enableTelegram: boole
   console.log(`    ${x.green}┃${x.reset} ${x.bold}${x.white}WhatsApp${x.reset}`);
   const enableWhatsapp = await askYesNo(rl, 'Enable WhatsApp bot?', false);
   if (enableWhatsapp) {
-    logInfo('WhatsApp uses QR-code pairing — configured on first bot start');
+    console.log(`    ${x.cyan}●${x.reset} ${x.dim}WhatsApp uses QR-code pairing — configured on first bot start${x.reset}`);
   }
 
   return { enableTelegram, telegramToken, enableDiscord, discordToken, enableWhatsapp, botKeys };
 }
 
 async function stepDaemon(rl: readline.Interface): Promise<{ logLevel: string; socketPath: string }> {
-  stepHeader(5, 5, 'Daemon & Security');
+  stepHeader(4, 4, 'Daemon & Security');
   console.log(`    ${x.white}Configure the background daemon process.${x.reset}`);
   console.log('');
 
@@ -497,21 +403,6 @@ ${cfg.keys['google_ai_api_key'] ? `      gemini:
         key_ref: "google_ai_api_key"` : `      # gemini:
       #   model: "gemini-pro"
       #   key_ref: "google_ai_api_key"`}
-${cfg.useLocalAi ? `      ollama_local:
-        type: ollama
-        base_url: "${cfg.ollamaUrl}"
-        model: "${cfg.ollamaModel}"
-      lmstudio_local:
-        type: lmstudio
-        base_url: "${cfg.lmstudioUrl}"
-        model: "${cfg.lmstudioModel}"` : `      # ollama_local:
-      #   type: ollama
-      #   base_url: "http://localhost:11434"
-      #   model: "llama3.3"
-      # lmstudio_local:
-      #   type: lmstudio
-      #   base_url: "http://127.0.0.1:1234"
-      #   model: "lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF"`}
 
   agents:
     agentic:
@@ -598,13 +489,6 @@ ANTHROPIC_API_KEY=${cfg.keys['anthropic_api_key'] || ''}
 OPENAI_API_KEY=${cfg.keys['openai_api_key'] || ''}
 GOOGLE_AI_API_KEY=${cfg.keys['google_ai_api_key'] || ''}
 
-# ── Local AI Backend ───────────────────────────────────────────────────────
-LOCAL_AI_PROVIDER=${cfg.useLocalAi ? (cfg.lmstudioModel ? 'lmstudio' : 'ollama') : ''}
-OLLAMA_BASE_URL=${cfg.ollamaUrl || 'http://localhost:11434'}
-OLLAMA_MODEL=${cfg.ollamaModel || ''}
-LMSTUDIO_BASE_URL=${cfg.lmstudioUrl || 'http://127.0.0.1:1234'}
-LMSTUDIO_MODEL=${cfg.lmstudioModel || ''}
-
 # ── Bot Tokens ─────────────────────────────────────────────────────────────
 TELEGRAM_BOT_TOKEN=${cfg.keys['telegram_bot_token'] || ''}
 DISCORD_BOT_TOKEN=${cfg.keys['discord_bot_token'] || ''}
@@ -630,7 +514,6 @@ export async function runSetupWizard(): Promise<void> {
 
     const masterPassword = await stepMasterPassword(rl);
     const { keys: cloudKeys, defaultProvider, fallbackProvider } = await stepCloudProviders(rl);
-    const localAi = await stepLocalAi(rl);
     const bots = await stepBots(rl);
     const daemon = await stepDaemon(rl);
 
@@ -676,11 +559,6 @@ export async function runSetupWizard(): Promise<void> {
       defaultProvider,
       fallbackProvider,
       keys: allKeys,
-      ollamaUrl: localAi.ollamaUrl,
-      ollamaModel: localAi.ollamaModel,
-      lmstudioUrl: localAi.lmstudioUrl,
-      lmstudioModel: localAi.lmstudioModel,
-      useLocalAi: localAi.useLocalAi,
       enableTelegram: bots.enableTelegram,
       telegramToken: bots.telegramToken,
       enableDiscord: bots.enableDiscord,
@@ -700,7 +578,7 @@ export async function runSetupWizard(): Promise<void> {
 
     // ── Summary ──────────────────────────────────────────────────────────
 
-    const providerCount = Object.keys(cloudKeys).length + (localAi.useLocalAi ? 2 : 0);
+    const providerCount = Object.keys(cloudKeys).length;
     const botCount = [bots.enableTelegram, bots.enableDiscord, bots.enableWhatsapp].filter(Boolean).length;
 
     console.log('');
