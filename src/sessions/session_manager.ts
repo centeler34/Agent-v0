@@ -4,6 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { parse as parseYaml } from 'yaml';
 import { ScopeEnforcer, type EngagementScope } from './scope_enforcer.js';
 
@@ -32,7 +33,7 @@ export class SessionManager {
       throw new Error(`Invalid session name: "${name}". Use only alphanumeric, hyphens, underscores, and dots.`);
     }
 
-    const id = `session-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const id = `session-${crypto.randomUUID()}`;
     const workspaceRoot = path.join(this.workspaceBase, name);
 
     // Verify resolved path stays within workspace base
@@ -50,9 +51,16 @@ export class SessionManager {
     }
 
     let scope: EngagementScope | undefined;
-    if (scopeFile && fs.existsSync(scopeFile)) {
-      const scopeYaml = fs.readFileSync(scopeFile, 'utf-8');
-      scope = parseYaml(scopeYaml) as EngagementScope;
+    if (scopeFile) {
+      const resolvedScope = path.resolve(scopeFile);
+      const cwd = path.resolve(process.cwd());
+      if (!resolvedScope.startsWith(cwd + path.sep) && resolvedScope !== cwd) {
+        throw new Error(`Scope file must be within the current directory: ${scopeFile}`);
+      }
+      if (fs.existsSync(resolvedScope)) {
+        const scopeYaml = fs.readFileSync(resolvedScope, 'utf-8');
+        scope = parseYaml(scopeYaml) as EngagementScope;
+      }
     }
 
     const session: Session = {
