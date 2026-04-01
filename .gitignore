@@ -44,3 +44,4 @@ quarantine/
 
 # Claude Code
 .claude/
+Cargo.lock

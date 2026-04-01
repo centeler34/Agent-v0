@@ -2,7 +2,7 @@
  * Gateway provider configuration types.
  */
 
-export type ProviderType = 'anthropic' | 'openai' | 'gemini' | 'mistral' | 'ollama' | 'lmstudio';
+export type ProviderType = 'anthropic' | 'openai' | 'gemini' | 'mistral';
 
 export interface SshTunnelConfig {
   enabled: boolean;

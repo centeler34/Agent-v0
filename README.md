@@ -29,7 +29,7 @@ Agent Cyplex enables coordinated AI assistance across complex, parallelizable wo
 
 - **CLI-first** — Full terminal interface with interactive REPL, no GUI required
 - **Multi-agent orchestration** — A central "Agentic" orchestrator decomposes tasks, delegates to specialized subordinate agents, and synthesizes results
-- **Model-agnostic** — Route tasks to Anthropic Claude, OpenAI GPT, Google Gemini, Ollama, or LM Studio
+- **Model-agnostic** — Route tasks to Anthropic Claude, OpenAI GPT, or Google Gemini
 - **OS-level sandboxing** — Agents are confined to assigned workspaces using Linux namespaces, seccomp, and Bubblewrap
 - **Hash-chained audit logs** — Tamper-evident, append-only SHA-256 chained audit trail for every agent action
 - **Encrypted keystore** — API keys and secrets encrypted at rest with Argon2id key derivation
@@ -37,7 +37,6 @@ Agent Cyplex enables coordinated AI assistance across complex, parallelizable wo
 - **YAML-based skills** — Modular, extensible skill definitions for recon, code analysis, forensics, threat intel, and reporting
 - **Persistent daemon** — Background daemon with Unix socket IPC; tasks survive CLI disconnection
 - **Bot integrations** — Telegram, Discord, and WhatsApp adapters for remote task submission
-- **Local AI support** — Full offline operation with Ollama or LM Studio, including SSH tunnel management for remote inference hosts
 - **Cost tracking** — Per-agent, per-session token usage and cost breakdown
 
 ---
@@ -84,7 +83,7 @@ Agent Cyplex enables coordinated AI assistance across complex, parallelizable wo
                                    |
               +--------------------+--------------------+
               |          |         |         |          |
-         Anthropic   OpenAI    Gemini    Ollama    LM Studio
+         Anthropic   OpenAI    Gemini
 ```
 
 ### How It Works
@@ -159,10 +158,6 @@ Agent Cyplex implements defense-in-depth security across multiple layers, all bu
 | **Anthropic** | Cloud | Claude 4 Opus, Sonnet, Haiku | Pay-per-token |
 | **OpenAI** | Cloud | GPT-4o, GPT-4, GPT-3.5 | Pay-per-token |
 | **Google Gemini** | Cloud | Gemini Pro, Ultra | Pay-per-token |
-| **Ollama** | Local | Any GGUF model | Free |
-| **LM Studio** | Local | Any supported model | Free |
-
-Local providers can run on the same machine or on a remote host via automatic SSH tunnels managed by the daemon.
 
 ---
 
@@ -239,9 +234,8 @@ On first launch, Agent Cyplex runs an **interactive setup wizard** that guides y
 
 1. **Master password** — Encrypts all API keys in the keystore
 2. **Cloud AI providers** — Anthropic, OpenAI, Gemini API keys
-3. **Local AI backends** — Ollama and LM Studio endpoints
-4. **Bot integrations** — Telegram, Discord, WhatsApp tokens
-5. **Daemon settings** — Log level, socket path
+3. **Bot integrations** — Telegram, Discord, WhatsApp tokens
+4. **Daemon settings** — Log level, socket path
 
 The wizard generates the following files under `~/.cyplex/`:
 
@@ -335,10 +329,6 @@ agent-cyplex skill verify ./skill.yaml
 ### Model Management
 
 ```bash
-agent-cyplex model list         # List configured providers
-agent-cyplex model test ollama  # Test provider connectivity
-```
-
 ### Audit Logs
 
 ```bash

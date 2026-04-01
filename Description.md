@@ -31,7 +31,7 @@ Rather than a single AI answering queries sequentially, Cyplex deploys a fleet o
 - **CLI-first**: No bloated GUI. The terminal is the interface.
 - **Auditable**: Every agent action is logged in a tamper-evident, hash-chained audit log.
 - **Sandboxed**: Agents cannot touch directories outside their assigned workspace. Period.
-- **Model-agnostic**: Route tasks to Anthropic Claude, OpenAI GPT, Google Gemini, or localized AI backends (Ollama, LM Studio) — on the same machine or on a remote host over SSH, configured per agent.
+- **Model-agnostic**: Route tasks to Anthropic Claude, OpenAI GPT, or Google Gemini — configured per agent.
 - **Extensible**: Modular YAML-based skill files allow new capabilities without code changes.
 - **Secure by default**: API keys are encrypted at rest; bot integrations require allowlists; permissions are enforced, not advisory.
 
@@ -132,8 +132,6 @@ Supported provider backends:
 - **OpenAI** (`openai`)
 - **Google Gemini** (`@google/generative-ai`)
 - **Mistral** (OpenAI-compatible REST)
-- **Ollama** (local or remote REST) — same machine via `localhost`, or a remote host via `http://<ip>:<port>`, or tunneled over SSH
-- **LM Studio** (local OpenAI-compatible REST server) — same machine via `localhost:1234`, or remote via IP:port or SSH tunnel
 
 ### 2.5 Persistent Daemon
 
@@ -155,150 +153,6 @@ The daemon provides:
 - Graceful shutdown with `--drain` flag to wait for in-flight tasks before exit
 
 The CLI itself is a thin client that connects to the daemon socket and streams output. Long-running research sessions can be fully detached and reattached.
-
-### 2.6 Localized AI Backends
-
-Cyplex supports fully local AI inference — no cloud API keys required. Local models are first-class citizens in the gateway: any agent can be pointed at a local backend the same way it would point at Anthropic or OpenAI.
-
-#### Supported Local Runtimes
-
-| Runtime | Default Endpoint | Protocol |
-|---|---|---|
-| **Ollama** | `http://localhost:11434` | OpenAI-compatible REST (`/api/chat`, `/api/generate`) |
-| **LM Studio** | `http://localhost:1234/v1` | OpenAI-compatible REST (`/v1/chat/completions`) |
-
-Both expose an OpenAI-compatible API, so the gateway uses a single `LocalModelAdapter` for both — only the base URL and model name differ.
-
-#### Connection Modes
-
-**Mode 1 — Same Machine (localhost)**
-
-The simplest case. Ollama or LM Studio is running on the same host as the Cyplex daemon. No network traversal; communication stays in loopback.
-
-```yaml
-providers:
-  ollama_local:
-    type: ollama
-    base_url: "http://localhost:11434"
-    model: "llama3.3"
-
-  lmstudio_local:
-    type: lmstudio
-    base_url: "http://localhost:1234/v1"
-    model: "lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF"
-```
-
-**Mode 2 — Remote Machine (direct IP:port)**
-
-Ollama or LM Studio is running on a separate machine on the same LAN or accessible network. Point the gateway at the remote host's IP and the port the inference server is bound to.
-
-> **Note**: Ollama must be started with `OLLAMA_HOST=0.0.0.0` to bind to all interfaces on the remote machine. LM Studio must have "Local Network Access" enabled in its server settings.
-
-```yaml
-providers:
-  ollama_remote:
-    type: ollama
-    base_url: "http://192.168.1.50:11434"
-    model: "mistral"
-
-  lmstudio_remote:
-    type: lmstudio
-    base_url: "http://192.168.1.75:1234/v1"
-    model: "TheBloke/Mistral-7B-Instruct-v0.2-GGUF"
-```
-
-**Mode 3 — Remote Machine over SSH Tunnel (passwordless)**
-
-For remote AI hosts that are not directly reachable (different subnet, behind NAT, or security policy prevents open ports), Cyplex can establish a **passwordless SSH tunnel** automatically before attempting any model calls. The AI and the daemon communicate through the encrypted tunnel; the remote inference port never needs to be exposed to the network.
-
-SSH authentication uses **key-based auth only** — no passwords. The private key path is configured in `config.yaml` and must have a corresponding public key installed on the remote host (`~/.ssh/authorized_keys`).
-
-Tunnel lifecycle is managed by the daemon:
-1. Daemon start: SSH tunnels for all configured remote backends are established
-2. Heartbeat loop: tunnels are monitored; auto-reconnect on drop (with exponential backoff)
-3. Daemon stop: tunnels are cleanly torn down
-
-```yaml
-providers:
-  ollama_ssh:
-    type: ollama
-    base_url: "http://localhost:11435"   # local port that the tunnel forwards to
-    model: "codellama"
-    ssh_tunnel:
-      enabled: true
-      remote_host: "ai-rig.internal"     # hostname or IP of the remote machine
-      remote_port: 11434                  # port Ollama is listening on remotely
-      local_port: 11435                   # local forwarding port (must be unique per tunnel)
-      ssh_user: "cyplex"
-      ssh_key_path: "~/.ssh/cyplex_ai_rsa"
-      keepalive_interval_s: 30
-      reconnect_on_failure: true
-
-  lmstudio_ssh:
-    type: lmstudio
-    base_url: "http://localhost:1235/v1"
-    model: "bartowski/Phi-3.5-mini-instruct-GGUF"
-    ssh_tunnel:
-      enabled: true
-      remote_host: "192.168.10.20"
-      remote_port: 1234
-      local_port: 1235
-      ssh_user: "researcher"
-      ssh_key_path: "~/.ssh/cyplex_lmstudio_rsa"
-      keepalive_interval_s: 30
-      reconnect_on_failure: true
-```
-
-The gateway resolves the tunnel endpoint transparently — the agent code never knows whether the model is local or remote.
-
-#### SSH Key Setup (One-Time)
-
-```bash
-# Generate a dedicated keypair for Cyplex AI tunnels (no passphrase = passwordless)
-ssh-keygen -t ed25519 -f ~/.ssh/cyplex_ai_rsa -N "" -C "cyplex-ai-tunnel"
-
-# Copy the public key to the remote AI host
-ssh-copy-id -i ~/.ssh/cyplex_ai_rsa.pub cyplex@ai-rig.internal
-
-# Register the key path in Cyplex (stored encrypted in keystore)
-cyplex keys set --name ssh_key_ollama_rig --file ~/.ssh/cyplex_ai_rsa
-```
-
-#### Tunnel Management CLI
-
-```bash
-cyplex model tunnels list              # Show all configured SSH tunnels and their status
-cyplex model tunnels test ollama_ssh   # Test connectivity through a named tunnel
-cyplex model tunnels reconnect         # Force reconnect all tunnels
-```
-
-#### Model Discovery
-
-When a local backend is reachable, Cyplex can auto-discover available models:
-
-```bash
-cyplex model list --provider ollama_local        # Lists all models pulled in Ollama
-cyplex model list --provider lmstudio_local      # Lists all models loaded in LM Studio
-cyplex model test --provider ollama_ssh          # Sends a ping prompt to verify the connection
-cyplex model pull ollama_local llama3.3          # Pull a model via Ollama (same-machine only)
-```
-
-#### Per-Agent Local Model Assignment
-
-Any agent can be configured to use a local backend instead of a cloud provider — including for air-gapped or offline deployments:
-
-```yaml
-agents:
-  code:
-    model_override: "ollama_local/codellama"   # Use local Ollama for code tasks
-
-  recon:
-    model_override: "lmstudio_remote/mistral"  # Use remote LM Studio for recon tasks
-
-  agentic:
-    model_override: "anthropic/claude-opus-4-6"  # Keep orchestrator on cloud model
-    fallback_model: "ollama_ssh/llama3.3"         # Fall back to SSH-tunneled local if cloud fails
-```
 
 ---
 
@@ -1047,7 +901,6 @@ Node.js with TypeScript is the recommended runtime. Strong async I/O for concurr
 | Schema validation | `zod` |
 | Concurrent task queue | `p-queue` |
 | AI providers (cloud) | `@anthropic-ai/sdk`, `openai`, `@google/generative-ai` |
-| AI providers (local) | OpenAI-compatible REST client (covers both Ollama and LM Studio) |
 | SSH tunneling | `ssh2` npm package — programmatic SSH client for tunnel management |
 
 ### 8.2 Bot Libraries
@@ -1119,51 +972,9 @@ cyplex:
       openai:
         model: "gpt-4o"
         key_ref: "openai_api_key"
-      # --- Local backends ---
-      ollama_local:
-        type: ollama
-        base_url: "http://localhost:11434"
-        model: "llama3.3"
-
-      lmstudio_local:
-        type: lmstudio
-        base_url: "http://localhost:1234/v1"
-        model: "lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF"
-
-      # --- Remote backends (direct IP:port) ---
-      ollama_remote:
-        type: ollama
-        base_url: "http://192.168.1.50:11434"
-        model: "mistral"
-
-      # --- Remote backends (SSH tunnel, passwordless key auth) ---
-      ollama_ssh:
-        type: ollama
-        base_url: "http://localhost:11435"
-        model: "codellama"
-        ssh_tunnel:
-          enabled: true
-          remote_host: "ai-rig.internal"
-          remote_port: 11434
-          local_port: 11435
-          ssh_user: "cyplex"
-          ssh_key_path: "~/.ssh/cyplex_ai_rsa"
-          keepalive_interval_s: 30
-          reconnect_on_failure: true
-
-      lmstudio_ssh:
-        type: lmstudio
-        base_url: "http://localhost:1235/v1"
-        model: "bartowski/Phi-3.5-mini-instruct-GGUF"
-        ssh_tunnel:
-          enabled: true
-          remote_host: "192.168.10.20"
-          remote_port: 1234
-          local_port: 1235
-          ssh_user: "researcher"
-          ssh_key_path: "~/.ssh/cyplex_lmstudio_rsa"
-          keepalive_interval_s: 30
-          reconnect_on_failure: true
+      gemini:
+        model: "gemini-pro"
+        key_ref: "google_ai_api_key"
 
   agents:
     agentic:
@@ -1300,7 +1111,7 @@ Agents **refuse to act on out-of-scope targets** — the scope file is loaded at
 - [ ] Agentic orchestrator with basic task decomposition (rule-based, pre-LLM)
 - [ ] Two subordinate agents: Recon Agent and Code Agent
 - [ ] CLI: `task submit`, `task status`, `agent list`, `session new/attach`
-- [ ] Gateway with Anthropic Claude, OpenAI, Ollama (localhost), and LM Studio (localhost) support
+- [ ] Gateway with Anthropic Claude, OpenAI, and Gemini support
 - [ ] AES-256-GCM encrypted keystore with Argon2id KDF
 - [ ] Basic audit logging (append-only JSON lines, no hash chaining yet)
 - [ ] Path-validation sandboxing (canonicalization + deny, no namespace isolation yet)
@@ -1341,8 +1152,6 @@ Agents **refuse to act on out-of-scope targets** — the scope file is loaded at
 - [ ] Agent self-improvement: agents can propose new skill YAML files from recurring patterns
 - [ ] Plugin API: third-party agents can register with the daemon
 - [ ] CyplexHub community submissions with signed review pipeline
-- [ ] SSH tunnel manager for remote Ollama/LM Studio backends with auto-reconnect
-- [ ] Local-only mode hardened for air-gapped deployments (Ollama + LM Studio, no cloud calls)
 - [ ] Integration with DefectDojo, JIRA, and GitHub Issues for automated finding ticketing
 - [ ] Encrypted session backup and restore
 
@@ -1457,7 +1266,7 @@ agent-cyplex/
 │   │   ├── anthropic_adapter.ts        # Anthropic Claude adapter (@anthropic-ai/sdk)
 │   │   ├── openai_adapter.ts           # OpenAI GPT adapter (openai)
 │   │   ├── gemini_adapter.ts           # Google Gemini adapter (@google/generative-ai)
-│   │   ├── local_model_adapter.ts      # Shared adapter for Ollama + LM Studio (OpenAI-compat REST)
+│   │   ├── rate_limiter.ts              # Per-agent token rate limiting
 │   │   ├── rate_limiter.ts             # Per-agent token budget and global rate limiting
 │   │   ├── cost_tracker.ts             # Token usage and cost accumulation per session
 │   │   └── model_client.ts             # ModelClient interface definition
@@ -1626,7 +1435,7 @@ agent-cyplex/
     └── integration/
         ├── end_to_end_task.test.ts     # Full task submit → agent → result cycle test
         ├── bot_telegram.test.ts        # Telegram adapter integration test (mock server)
-        └── local_model.test.ts         # Ollama/LM Studio connectivity tests
+        └── gateway.test.ts             # Gateway routing tests
 ```
 
 ---

@@ -24,14 +24,9 @@ cyplex:
       openai:
         model: "gpt-4o"
         key_ref: "openai_api_key"
-      ollama_local:
-        type: ollama
-        base_url: "http://localhost:11434"
-        model: "llama3.3"
-      lmstudio_local:
-        type: lmstudio
-        base_url: "http://127.0.0.1:1234"
-        model: "lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF"
+      gemini:
+        model: "gemini-pro"
+        key_ref: "google_ai_api_key"
 
   agents:
     agentic:

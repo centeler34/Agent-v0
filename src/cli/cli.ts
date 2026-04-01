@@ -16,12 +16,9 @@ import { registerConfigCommands } from './commands/config_cmd.js';
 import { registerAuditCommands } from './commands/audit_cmd.js';
 import { registerBotCommands } from './commands/bot_cmd.js';
 import { registerKeysCommands } from './commands/keys_cmd.js';
-import { registerModelCommands } from './commands/model_cmd.js';
 import { isFirstRun, runSetupWizard } from './setup_wizard.js';
 import { runUpdate } from './updater.js';
 import { runUninstall } from './uninstaller.js';
-import { LocalModelAdapter } from '../gateway/local_model_adapter.js';
-import type { Message } from '../types/provider_config.js';
 
 // ── ANSI Color Palette ──────────────────────────────────────────────────────
 
@@ -50,7 +47,6 @@ const c = {
   bgCyan:    '\x1b[46m',
   bgWhite:   '\x1b[47m',
 
-  // 256-color / bright
   gray:        '\x1b[90m',
   brightRed:   '\x1b[91m',
   brightGreen: '\x1b[92m',
@@ -60,7 +56,6 @@ const c = {
   brightCyan:  '\x1b[96m',
   brightWhite: '\x1b[97m',
 
-  // Custom 256-color
   orange:  '\x1b[38;5;208m',
   purple:  '\x1b[38;5;141m',
   teal:    '\x1b[38;5;43m',
@@ -81,7 +76,6 @@ function box(lines: string[], borderColor: string = c.cyan): string {
   const top    = `${borderColor}╭${'─'.repeat(w - 2)}╮${c.reset}`;
   const bottom = `${borderColor}╰${'─'.repeat(w - 2)}╯${c.reset}`;
   const padded = lines.map(line => {
-    // Strip ANSI for length calculation
     const visible = line.replace(/\x1b\[[0-9;]*m/g, '');
     const pad = Math.max(0, w - 4 - visible.length);
     return `${borderColor}│${c.reset} ${line}${' '.repeat(pad)} ${borderColor}│${c.reset}`;
@@ -104,7 +98,7 @@ function printBanner(): void {
   console.log(`  ${c.blue}${c.bold} ╚██████╗   ██║   ██║     ███████╗███████╗██╔╝ ██╗${c.reset}`);
   console.log(`  ${c.brightBlue}${c.bold}  ╚═════╝   ╚═╝   ╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝${c.reset}`);
   console.log('');
-  console.log(`  ${c.bold}${c.white}  Agent Cyplex${c.reset}  ${c.dim}v0.1.0${c.reset}`);
+  console.log(`  ${c.bold}${c.white}  Agent Cyplex${c.reset}  ${c.dim}v0.2.0${c.reset}`);
   console.log(`  ${c.dim}  Multi-Agent AI Orchestration Terminal${c.reset}`);
   console.log(`  ${c.dim}  Security Research Edition${c.reset}`);
   console.log('');
@@ -112,20 +106,25 @@ function printBanner(): void {
 
 // ── System Info Bar ─────────────────────────────────────────────────────────
 
-function printSystemInfo(adapter: LocalModelAdapter | null): void {
+function printSystemInfo(): void {
   const user = os.userInfo().username;
   const hostname = os.hostname();
   const platform = `${os.type()} ${os.arch()}`;
   const mem = `${Math.round(os.freemem() / 1024 / 1024)}MB free`;
 
-  const aiStatus = adapter
-    ? `${c.green}●${c.reset} ${c.white}${adapter.provider}${c.reset} ${c.dim}(live)${c.reset}`
-    : `${c.red}●${c.reset} ${c.dim}no AI backend${c.reset}`;
+  const providers: string[] = [];
+  if (process.env.ANTHROPIC_API_KEY) providers.push('Anthropic');
+  if (process.env.OPENAI_API_KEY) providers.push('OpenAI');
+  if (process.env.GOOGLE_AI_API_KEY) providers.push('Gemini');
+
+  const aiStatus = providers.length > 0
+    ? `${c.green}●${c.reset} ${c.white}${providers.join(', ')}${c.reset}`
+    : `${c.red}●${c.reset} ${c.dim}no providers configured${c.reset}`;
 
   console.log(box([
-    `${c.teal}${c.bold}System${c.reset}    ${c.white}${user}@${hostname}${c.reset}  ${c.dim}│${c.reset}  ${c.slate}${platform}${c.reset}  ${c.dim}│${c.reset}  ${c.slate}${mem}${c.reset}`,
-    `${c.teal}${c.bold}AI${c.reset}        ${aiStatus}`,
-    `${c.teal}${c.bold}Session${c.reset}   ${c.dim}${new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}${c.reset}`,
+    `${c.teal}${c.bold}System${c.reset}      ${c.white}${user}@${hostname}${c.reset}  ${c.dim}│${c.reset}  ${c.slate}${platform}${c.reset}  ${c.dim}│${c.reset}  ${c.slate}${mem}${c.reset}`,
+    `${c.teal}${c.bold}Providers${c.reset}   ${aiStatus}`,
+    `${c.teal}${c.bold}Session${c.reset}     ${c.dim}${new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}${c.reset}`,
   ], c.darkGray));
   console.log('');
 }
@@ -144,8 +143,7 @@ function printHelp(): void {
     ['/update',    'Fetch latest from GitHub & rebuild'],
     ['/uninstall', 'Remove Agent Cyplex completely'],
     ['/status',    'Query daemon health & status'],
-    ['/clear',     'Clear chat history'],
-    ['/models',    'List available AI models'],
+    ['/clear',     'Clear session context'],
     ['exit',       'Quit the terminal'],
   ];
 
@@ -189,7 +187,6 @@ function printHelp(): void {
     ['audit',   'Security audit logs'],
     ['bot',     'Chat bot integrations'],
     ['keys',    'Encrypted keystore management'],
-    ['model',   'Local AI model management'],
   ];
 
   for (const [mod, desc] of mods) {
@@ -197,45 +194,11 @@ function printHelp(): void {
   }
 
   console.log('');
-  console.log(`  ${c.dim}Type any message to chat with the AI. Use commands above for specific tasks.${c.reset}`);
+  console.log(`  ${c.dim}Use commands above for specific tasks. Submit tasks via the daemon.${c.reset}`);
   console.log('');
 }
 
-// ── Loading Spinner ─────────────────────────────────────────────────────────
-
-class Spinner {
-  private frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  private interval: ReturnType<typeof setInterval> | null = null;
-  private frameIdx = 0;
-  private message: string;
-
-  constructor(message: string) {
-    this.message = message;
-  }
-
-  start(): void {
-    process.stdout.write('\x1b[?25l'); // hide cursor
-    this.interval = setInterval(() => {
-      const frame = this.frames[this.frameIdx % this.frames.length];
-      process.stdout.write(`\r  ${c.cyan}${frame}${c.reset} ${c.dim}${this.message}${c.reset}`);
-      this.frameIdx++;
-    }, 80);
-  }
-
-  stop(finalMsg?: string): void {
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = null;
-    }
-    process.stdout.write('\r\x1b[2K'); // clear line
-    process.stdout.write('\x1b[?25h'); // show cursor
-    if (finalMsg) {
-      console.log(finalMsg);
-    }
-  }
-}
-
-// ── Env & Adapter ───────────────────────────────────────────────────────────
+// ── Env Loader ──────────────────────────────────────────────────────────────
 
 function loadEnvFile(): void {
   const envPath = path.join(process.env.HOME || '~', '.cyplex', '.env');
@@ -252,81 +215,6 @@ function loadEnvFile(): void {
       process.env[key] = value;
     }
   }
-}
-
-function resolveModelAdapter(): { adapter: LocalModelAdapter | null; providerName: string; modelName: string } {
-  const envPath = path.join(process.env.HOME || '~', '.cyplex', '.env');
-  let provider: 'ollama' | 'lmstudio' = 'ollama';
-  let baseUrl = '';
-  let model = '';
-
-  if (fs.existsSync(envPath)) {
-    const content = fs.readFileSync(envPath, 'utf-8');
-    for (const line of content.split('\n')) {
-      const t = line.trim();
-      if (t.startsWith('OLLAMA_BASE_URL=')) baseUrl = baseUrl || t.split('=').slice(1).join('=');
-      if (t.startsWith('LMSTUDIO_BASE_URL=')) { baseUrl = t.split('=').slice(1).join('='); provider = 'lmstudio'; }
-      if (t.startsWith('OLLAMA_MODEL=')) model = t.split('=').slice(1).join('=');
-      if (t.startsWith('LMSTUDIO_MODEL=')) { model = t.split('=').slice(1).join('='); provider = 'lmstudio'; }
-      if (t.startsWith('LOCAL_AI_PROVIDER=')) {
-        const v = t.split('=').slice(1).join('=').toLowerCase();
-        if (v === 'lmstudio' || v === 'ollama') provider = v;
-      }
-    }
-  }
-
-  if (process.env.LMSTUDIO_BASE_URL) { baseUrl = process.env.LMSTUDIO_BASE_URL; provider = 'lmstudio'; }
-  if (process.env.OLLAMA_BASE_URL && !baseUrl) { baseUrl = process.env.OLLAMA_BASE_URL; }
-  if (process.env.LMSTUDIO_MODEL) { model = process.env.LMSTUDIO_MODEL; provider = 'lmstudio'; }
-  if (process.env.OLLAMA_MODEL && !model) { model = process.env.OLLAMA_MODEL; }
-
-  if (!baseUrl) {
-    baseUrl = provider === 'lmstudio' ? 'http://127.0.0.1:1234' : 'http://localhost:11434';
-  }
-  if (!model) {
-    model = provider === 'lmstudio' ? 'default' : 'llama3.3';
-  }
-
-  try {
-    return {
-      adapter: new LocalModelAdapter({
-        name: provider,
-        type: provider,
-        model,
-        base_url: baseUrl,
-        timeout_ms: 120000,
-        max_retries: 1,
-      }),
-      providerName: provider === 'lmstudio' ? 'LM Studio' : 'Ollama',
-      modelName: model,
-    };
-  } catch {
-    return { adapter: null, providerName: '', modelName: '' };
-  }
-}
-
-// ── Word Wrap for AI Responses ──────────────────────────────────────────────
-
-function wordWrap(text: string, width: number, indent: string = '  '): string {
-  const lines: string[] = [];
-  for (const paragraph of text.split('\n')) {
-    if (paragraph.trim() === '') {
-      lines.push('');
-      continue;
-    }
-    const words = paragraph.split(' ');
-    let current = '';
-    for (const word of words) {
-      if (current.length + word.length + 1 > width) {
-        lines.push(indent + current);
-        current = word;
-      } else {
-        current = current ? current + ' ' + word : word;
-      }
-    }
-    if (current) lines.push(indent + current);
-  }
-  return lines.join('\n');
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -347,7 +235,7 @@ async function main(): Promise<void> {
   program
     .name('agent-cyplex')
     .description('Agent Cyplex — Multi-agent AI orchestration CLI')
-    .version('0.1.0');
+    .version('0.2.0');
 
   program.command('setup')
     .description('Run the setup wizard to configure API keys, providers, and integrations')
@@ -370,7 +258,6 @@ async function main(): Promise<void> {
   registerAuditCommands(program);
   registerBotCommands(program);
   registerKeysCommands(program);
-  registerModelCommands(program);
 
   program.action(() => { launchRepl(); });
 
@@ -385,28 +272,12 @@ async function launchRepl(): Promise<void> {
   const readline = await import('node:readline');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-  const { adapter, providerName, modelName } = resolveModelAdapter();
-  const chatHistory: Message[] = [];
-  let msgCount = 0;
-
   // ── Welcome Screen
   console.clear();
   printBanner();
-  printSystemInfo(adapter);
+  printSystemInfo();
 
-  if (adapter) {
-    console.log(
-      `  ${c.green}●${c.reset} ${c.bold}AI Ready${c.reset}  ${c.dim}─${c.reset}  ` +
-      `${c.white}${providerName}${c.reset} ${c.dim}→${c.reset} ${c.cyan}${modelName}${c.reset}`
-    );
-  } else {
-    console.log(
-      `  ${c.red}●${c.reset} ${c.bold}No AI Backend${c.reset}  ${c.dim}─${c.reset}  ` +
-      `${c.dim}Run ${c.yellow}/setup${c.dim} to configure${c.reset}`
-    );
-  }
-
-  console.log(`  ${c.dim}Type ${c.white}/help${c.dim} for commands, or start chatting.${c.reset}`);
+  console.log(`  ${c.dim}Type ${c.white}/help${c.dim} for commands.${c.reset}`);
   console.log('');
   console.log(divider('─', c.darkGray));
   console.log('');
@@ -418,7 +289,6 @@ async function launchRepl(): Promise<void> {
     rl.question(promptStr, async (input: string) => {
       const trimmed = input.trim();
 
-      // Empty input
       if (!trimmed) {
         showPrompt();
         return;
@@ -427,8 +297,7 @@ async function launchRepl(): Promise<void> {
       // Exit
       if (trimmed === 'exit' || trimmed === 'quit') {
         console.log('');
-        console.log(`  ${c.dim}Session ended. ${msgCount} message(s) exchanged.${c.reset}`);
-        console.log(`  ${c.dim}Goodbye.${c.reset}`);
+        console.log(`  ${c.dim}Session ended. Goodbye.${c.reset}`);
         console.log('');
         rl.close();
         return;
@@ -450,106 +319,27 @@ async function launchRepl(): Promise<void> {
         await runUninstall();
         return;
       } else if (trimmed === '/clear') {
-        chatHistory.length = 0;
-        msgCount = 0;
         console.clear();
         printBanner();
-        printSystemInfo(adapter);
-        console.log(`  ${c.green}✓${c.reset} ${c.dim}Chat history cleared.${c.reset}`);
+        printSystemInfo();
+        console.log(`  ${c.green}✓${c.reset} ${c.dim}Session cleared.${c.reset}`);
         console.log('');
         console.log(divider('─', c.darkGray));
         console.log('');
       } else if (trimmed === '/status') {
+        const providers: string[] = [];
+        if (process.env.ANTHROPIC_API_KEY) providers.push('Anthropic');
+        if (process.env.OPENAI_API_KEY) providers.push('OpenAI');
+        if (process.env.GOOGLE_AI_API_KEY) providers.push('Gemini');
+
         console.log('');
         console.log(box([
           `${c.bold}Daemon${c.reset}      ${c.yellow}●${c.reset} ${c.dim}checking...${c.reset}`,
-          `${c.bold}AI${c.reset}          ${adapter ? `${c.green}●${c.reset} ${providerName} → ${modelName}` : `${c.red}●${c.reset} not configured`}`,
-          `${c.bold}Messages${c.reset}    ${c.white}${msgCount}${c.reset} ${c.dim}this session${c.reset}`,
-          `${c.bold}History${c.reset}     ${c.white}${chatHistory.length}${c.reset} ${c.dim}entries in context${c.reset}`,
+          `${c.bold}Providers${c.reset}   ${providers.length > 0 ? `${c.green}●${c.reset} ${providers.join(', ')}` : `${c.red}●${c.reset} none configured`}`,
         ], c.darkGray));
         console.log('');
-      } else if (trimmed === '/models') {
-        if (!adapter) {
-          console.log(`\n  ${c.red}●${c.reset} ${c.dim}No AI backend configured.${c.reset}\n`);
-        } else {
-          const spin = new Spinner('Fetching models...');
-          spin.start();
-          try {
-            const models = await adapter.listModels();
-            spin.stop();
-            console.log('');
-            console.log(`  ${c.bold}${c.brightCyan}Available Models${c.reset}  ${c.dim}(${providerName})${c.reset}`);
-            console.log(divider());
-            console.log('');
-            for (const m of models) {
-              const active = m === modelName;
-              const dot = active ? `${c.green}●` : `${c.darkGray}○`;
-              const label = active ? `${c.white}${c.bold}${m}${c.reset} ${c.green}← active${c.reset}` : `${c.white}${m}${c.reset}`;
-              console.log(`    ${dot}${c.reset} ${label}`);
-            }
-            console.log('');
-          } catch (err: any) {
-            spin.stop();
-            console.log(`\n  ${c.red}●${c.reset} ${c.dim}${err.message}${c.reset}\n`);
-          }
-        }
       } else {
-        // ── AI Chat ─────────────────────────────────────────────────
-        if (!adapter) {
-          console.log(`\n  ${c.red}●${c.reset} ${c.white}No AI backend configured.${c.reset} Run ${c.yellow}/setup${c.reset} first.\n`);
-          showPrompt();
-          return;
-        }
-
-        chatHistory.push({ role: 'user', content: trimmed });
-        msgCount++;
-
-        console.log('');
-
-        const spin = new Spinner('Thinking...');
-        spin.start();
-
-        try {
-          let fullResponse = '';
-          let firstChunk = true;
-
-          for await (const chunk of adapter.stream({
-            messages: chatHistory,
-            system: 'You are Agent Cyplex, a multi-agent AI assistant specialized in cybersecurity, penetration testing, digital forensics, and security research. Be concise, technical, and helpful. Format responses with clear structure when appropriate.',
-            max_tokens: 4096,
-            temperature: 0.7,
-            stream: true,
-          })) {
-            if (firstChunk) {
-              spin.stop();
-              process.stdout.write(`  ${c.purple}┃${c.reset} `);
-              firstChunk = false;
-            }
-
-            // Handle newlines in streamed output with indentation
-            const text = chunk.delta.replace(/\n/g, `\n  ${c.purple}┃${c.reset} `);
-            process.stdout.write(text);
-            fullResponse += chunk.delta;
-          }
-
-          if (firstChunk) {
-            // No chunks received
-            spin.stop();
-            console.log(`  ${c.yellow}●${c.reset} ${c.dim}Empty response from model.${c.reset}`);
-          } else {
-            console.log('');
-          }
-
-          console.log('');
-          chatHistory.push({ role: 'assistant', content: fullResponse });
-        } catch (err: any) {
-          spin.stop();
-          console.log(`  ${c.red}●${c.reset} ${c.bold}Error${c.reset} ${c.dim}─${c.reset} ${c.red}${err.message}${c.reset}`);
-          console.log('');
-          // Remove the user message that failed
-          chatHistory.pop();
-          msgCount--;
-        }
+        console.log(`\n  ${c.dim}Submit tasks via the daemon or use ${c.white}/help${c.dim} for available commands.${c.reset}\n`);
       }
 
       showPrompt();

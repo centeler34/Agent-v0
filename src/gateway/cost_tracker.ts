@@ -23,8 +23,6 @@ const COST_PER_1K_TOKENS: Record<string, { prompt: number; completion: number }>
   anthropic: { prompt: 0.003, completion: 0.015 },
   openai: { prompt: 0.003, completion: 0.006 },
   gemini: { prompt: 0.00025, completion: 0.0005 },
-  ollama: { prompt: 0, completion: 0 },
-  lmstudio: { prompt: 0, completion: 0 },
   mistral: { prompt: 0.001, completion: 0.003 },
 };
 
