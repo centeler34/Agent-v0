@@ -146,11 +146,8 @@ cyplex daemon logs     # Tail daemon logs
 
 The daemon provides:
 
-- A Unix socket (`/tmp/cyplex.sock`) for CLI client attachment
-- A PID file (`/tmp/agent-v0.pid`) and lock preventing duplicate instances
-- A heartbeat loop confirming all registered agents are responsive
-- Session persistence: tasks survive CLI disconnection; reattach with `cyplex session attach`
-- Graceful shutdown with `--drain` flag to wait for in-flight tasks before exit
+- A Unix socket (`/tmp/agent-v0.sock`) for CLI client attachment
+- Session persistence: tasks survive CLI disconnection; reattach with `agent-v0 session attach`
 
 The CLI itself is a thin client that connects to the daemon socket and streams output. Long-running research sessions can be fully detached and reattached.
 
@@ -519,9 +516,7 @@ All secrets (AI provider API keys, OSINT platform tokens, bot tokens) are stored
 - **Encryption**: AES-256-GCM
 - **Key derivation**: Argon2id (memory: 64 MB, iterations: 3, parallelism: 4) from the user's master password
 - **At runtime**: Keys are decrypted into gateway memory only; never written to disk in plaintext, never set as environment variables, never appear in logs (redacted as `[REDACTED]`)
-- **Least privilege**: Each agent receives only the keys it needs — the Code Agent has no access to bot tokens; the Recon Agent has no access to the Code Agent's execution sandbox
-- **Rotation**: `cyplex keys rotate --provider anthropic` re-encrypts and logs the rotation event to the audit log
-- **Session scoping**: Keys can be scoped to a specific session, automatically invalidating when the session closes
+- **Rotation**: `agent-v0 keys rotate --provider anthropic` re-encrypts and logs the rotation event to the audit log
 The `TaskRegistry` now stores all API keys in an encrypted SQLite database, using a key derived from the master password.
 ### 6.3 Permission System
 
@@ -824,9 +819,9 @@ Skill file received (URL or local)
 After Agentic finishes the scan, the user sees a report before any approval decision:
 
 ```
-[cyplex] Skill scan complete: recon/passive_dns.yaml
+[agent-v0] Skill scan complete: recon/passive_dns.yaml
 ─────────────────────────────────────────────────────
-  Source      : https://cyplexhub.io/skills/recon/passive_dns.yaml
+  Source      : https://v0-hub.io/skills/recon/passive_dns.yaml
   Hash (SHA256): a3f9c1...
   Structural  : PASS
   Permissions : PASS  (requests network.allow: [dns.google, crt.sh] — within recon policy)
@@ -872,11 +867,11 @@ The quarantine scanner runs as an **isolated Agentic sub-task** — it has no ac
 #### New CLI Commands
 
 ```bash
-cyplex skill quarantine list              # Show all skills currently in quarantine
-cyplex skill quarantine inspect <hash>    # View the scan report for a quarantined skill
-cyplex skill quarantine approve <hash>    # Manually approve a pending skill
-cyplex skill quarantine reject <hash>     # Manually reject a pending skill
-cyplex skill quarantine purge             # Delete all rejected skills (irreversible, prompts confirm)
+agent-v0 skill quarantine list              # Show all skills currently in quarantine
+agent-v0 skill quarantine inspect <hash>    # View the scan report for a quarantined skill
+agent-v0 skill quarantine approve <hash>    # Manually approve a pending skill
+agent-v0 skill quarantine reject <hash>     # Manually reject a pending skill
+agent-v0 skill quarantine purge             # Delete all rejected skills (irreversible, prompts confirm)
 ```
 
 ---

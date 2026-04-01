@@ -1,8 +1,10 @@
-# Agent Cyplex
+# [🛡️ Security Architecture & Updates](./Security.md)
 
-**Multi-agent AI orchestration CLI terminal for security researchers, developers, and power users.**
+# Agent v0
 
-Agent Cyplex enables coordinated AI assistance across complex, parallelizable workflows — from network reconnaissance and digital forensics to code review and threat intelligence — all from a single terminal interface.
+**The universal multi-agent AI orchestration terminal. Coordinated intelligence for any desire.**
+
+Agent v0 is a powerful framework for deploying fleets of specialized AI agents. While optimized for security researchers and developers, its modular architecture allows anyone to orchestrate complex, parallel workflows—from creative content creation and data analysis to automated research and technical troubleshooting—all from a single, secure terminal interface.
 
 ---
 
@@ -33,7 +35,7 @@ Agent Cyplex enables coordinated AI assistance across complex, parallelizable wo
 - **OS-level sandboxing** — Agents are confined to assigned workspaces using Linux namespaces, seccomp, and Bubblewrap
 - **Hash-chained audit logs** — Tamper-evident, append-only SHA-256 chained audit trail for every agent action
 - **Encrypted keystore** — API keys and secrets encrypted at rest with Argon2id key derivation
-- **Permission enforcement** — Fine-grained per-agent policies for filesystem, network, API access, and inter-agent messaging
+- **Permission enforcement** — Fine-grained per-agent policies for filesystem, network, API access (including encrypted API keys from the database), and inter-agent messaging
 - **YAML-based skills** — Modular, extensible skill definitions for recon, code analysis, forensics, threat intel, and reporting
 - **Persistent daemon** — Background daemon with Unix socket IPC; tasks survive CLI disconnection
 - **Bot integrations** — Telegram, Discord, and WhatsApp adapters for remote task submission
@@ -99,9 +101,9 @@ Agent Cyplex enables coordinated AI assistance across complex, parallelizable wo
 
 ---
 
-## Security Implementation
+## Security Implementation (v1.0.0 Hardened)
 
-Agent Cyplex implements defense-in-depth security across multiple layers, all built in Rust for memory safety and performance:
+Agent v0 implements defense-in-depth security across multiple layers, all built in Rust for memory safety and performance:
 
 ### Sandbox Isolation (`rust/cyplex-sandbox`)
 
@@ -185,20 +187,20 @@ The SSH tunnel was originally used for proxying to local LLM backends (Ollama, L
 Paste this single command into your terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-cyplex/main/scripts/install-cyplex.sh | bash
+curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-v0/main/scripts/install-agent-v0.sh | bash
 ```
 
 This will:
 1. Install all required system dependencies (Node.js, Rust, Go, Python)
 2. Clone the repository
 3. Build all components (TypeScript, Rust, Go, Python)
-4. Install `agent-cyplex` as a system-wide command
-5. Create the configuration directory at `~/.cyplex/`
+4. Install `agent-v0` as a system-wide command
+5. Create the configuration directory at `~/.agent-v0/`
 
 After installation, just type:
 
 ```bash
-agent-cyplex
+agent-v0
 ```
 
 ### Manual Install
@@ -215,18 +217,18 @@ agent-cyplex
 
 ```bash
 # Clone the repository
-git clone https://github.com/centeler34/Agent-cyplex.git
-cd Agent-cyplex
+git clone https://github.com/centeler34/Agent-v0.git
+cd Agent-v0
 
 # Install Node.js dependencies
-npm install
+npm install --legacy-peer-deps
 
 # Build Rust security crates
 cargo build --release
 
 # Build Go utilities
-mkdir -p dist
-cd go/net-probe && go build -o ../../dist/net-probe . && cd ../..
+mkdir -p dist/go
+cd go/net-probe && go build -o ../../dist/go/net-probe . && cd ../..
 
 # Install Python dependencies
 pip install -r python/forensics-service/requirements.txt
@@ -236,7 +238,7 @@ pip install -r python/osint-utils/requirements.txt
 npx tsc
 
 # Create config directories
-mkdir -p ~/.cyplex/{logs,audit,workspaces,quarantine/{pending,approved,rejected}}
+mkdir -p ~/.agent-v0/{logs,audit,workspaces,quarantine/{pending,approved,rejected}}
 
 # Link the command globally
 npm link
@@ -246,32 +248,34 @@ npm link
 
 ## Configuration
 
-On first launch, Agent Cyplex runs an **interactive setup wizard** that guides you through:
+On first launch, Agent v0 runs an **interactive setup wizard** that guides you through:
 
 1. **Master password** — Encrypts all API keys in the keystore
 2. **Cloud AI providers** — Anthropic, OpenAI, Gemini API keys
 3. **Bot integrations** — Telegram, Discord, WhatsApp tokens
 4. **Daemon settings** — Log level, socket path
 
-The wizard generates the following files under `~/.cyplex/`:
+The wizard generates the following files under `~/.agent-v0/`:
 
 | File | Purpose |
 |------|---------|
-| `~/.cyplex/.env` | API keys, endpoints, bot tokens, daemon settings — loaded into `process.env` on every launch |
-| `~/.cyplex/config.yaml` | Full daemon, gateway, agent, bot, and security configuration |
-| `~/.cyplex/keystore.enc` | AES-256-GCM encrypted copy of all secrets (backup keystore) |
+| `~/.agent-v0/.env` | Daemon settings (log level, socket path) — loaded into `process.env` on every launch |
+| `~/.agent-v0/config.yaml` | Full daemon, gateway, agent, bot, and security configuration |
+| `~/.agent-v0/keystore.enc` | AES-256-GCM encrypted master key derived from your password, used to unlock `tasks.db` |
+| `~/.agent-v0/tasks.db` | Encrypted SQLite database storing tasks, secrets (API keys), and session data |
+| `~/.agent-v0/session.token` | Encrypted session token, valid for 3 days, allowing "auth once" CLI access |
 
 To re-run the wizard at any time:
 
 ```bash
-agent-cyplex setup
+agent-v0 setup
 ```
 
 You can also edit files directly:
 
 ```bash
-agent-cyplex config edit          # Open config.yaml in $EDITOR
-nano ~/.cyplex/.env               # Edit API keys manually
+agent-v0 config edit          # Open config.yaml in $EDITOR
+nano ~/.agent-v0/.env               # Edit daemon settings manually (API keys are in encrypted tasks.db)
 ```
 
 See [config/config.example.yaml](config/config.example.yaml) for full configuration reference.
@@ -406,6 +410,12 @@ skills/
 ```
 
 Custom skills can be loaded at runtime and are verified via cryptographic signatures and YARA scanning before execution.
+
+## Limitless Extensibility
+
+Agent v0 is not just a tool; it is a platform. You can define your own agent roles in `config.yaml`, assigning them specific models, workspace sandboxes, and permission sets. 
+
+Whether you want a **Creative Writer Agent**, a **Financial Analyst Agent**, or a **Personal Assistant Agent**, simply define the role and load the corresponding skills. The orchestrator handles the delegation.
 
 
 ## Bot Integrations

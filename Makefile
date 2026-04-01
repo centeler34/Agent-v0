@@ -13,7 +13,7 @@ build-ts:
 	npx tsc
 
 build-go:
-	cd go/net-probe && go build -o ../../dist/net-probe .
+	mkdir -p dist/go && cd go/net-probe && go build -o ../../dist/go/net-probe .
 
 # ── Development ────────────────────────────────────────────────────
 

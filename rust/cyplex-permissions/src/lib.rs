@@ -1,6 +1,6 @@
-//! # cyplex-permissions
+//! # agent-v0-permissions
 //!
-//! Per-agent permission enforcement engine for Agent Cyplex.
+//! Per-agent permission enforcement engine for Agent v0.
 //!
 //! Each agent operates under an [`AgentPolicy`] that constrains filesystem
 //! access, network egress, API usage, inter-agent communication, and process

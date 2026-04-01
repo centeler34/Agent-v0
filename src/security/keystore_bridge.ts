@@ -45,6 +45,16 @@ export class KeystoreBridge {
     };
   }
 
+  /**
+   * Returns the derived 32-byte master key for SQLite column encryption.
+   */
+  getDerivedKey(): Buffer {
+    if (!this.derivedKey) {
+      throw new Error('Keystore must be opened before accessing the master key');
+    }
+    return this.derivedKey;
+  }
+
   get(name: string): string | null {
     if (!this.data || !this.derivedKey) return null;
     const entry = this.data.entries[name];

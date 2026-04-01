@@ -51,8 +51,33 @@ function getInstallDir(): string {
   return repoRoot;
 }
 
+/**
+ * Cleans up empty or outdated artifact files to prevent deployment issues.
+ */
+function preUpdateCleanup(installDir: string): void {
+  const artifactPaths = [
+    path.join(installDir, 'dist'),
+    path.join(installDir, 'go/net-probe/net-probe'),
+  ];
+
+  for (const target of artifactPaths) {
+    if (!fs.existsSync(target)) continue;
+    const items = fs.statSync(target).isDirectory() ? fs.readdirSync(target) : [target];
+    
+    for (const item of items) {
+      const fpath = fs.statSync(target).isDirectory() ? path.join(target, item) : item;
+      if (fs.existsSync(fpath) && fs.statSync(fpath).isFile() && fs.statSync(fpath).size === 0) {
+        fs.unlinkSync(fpath);
+      }
+    }
+  }
+}
+
 export async function runUpdate(): Promise<void> {
   const installDir = getInstallDir();
+
+  // Run cleanup before starting update process
+  preUpdateCleanup(installDir);
 
   console.log('');
   console.log(`${CYAN}${'─'.repeat(60)}${NC}`);
@@ -176,9 +201,9 @@ export async function runUpdate(): Promise<void> {
   if (hasCommand('go')) {
     info('  Building Go utilities...');
     try {
-      const distDir = path.join(installDir, 'dist');
-      if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true });
-      run('go build -o ../../dist/net-probe .', path.join(installDir, 'go', 'net-probe'));
+      const goDistDir = path.join(installDir, 'dist', 'go');
+      if (!fs.existsSync(goDistDir)) fs.mkdirSync(goDistDir, { recursive: true });
+      run('go build -o ../../dist/go/net-probe .', path.join(installDir, 'go', 'net-probe'));
       success('  Go utilities built');
     } catch (e) {
       warn(`  Go build skipped: ${e}`);
@@ -198,12 +223,12 @@ export async function runUpdate(): Promise<void> {
   }
 
   console.log('');
-  success(`${BOLD}Update complete!${NC}`);
+  success(`${BOLD}Update complete! Agent v0 is ready.${NC}`);
   console.log('');
-
+  
   // ── Step 4: Restart ────────────────────────────────────────────────────
 
-  info('Restarting Agent Cyplex...');
+  info('Restarting Agent v0...');
   console.log('');
 
   // Spawn a new process and exit the current one
@@ -221,8 +246,12 @@ export async function runUpdate(): Promise<void> {
 }
 
 function hasCommand(cmd: string): boolean {
+  // Validate command name to prevent command injection (CWE-78)
+  if (!/^[a-zA-Z0-9_-]+$/.test(cmd)) {
+    return false;
+  }
   try {
-    execSync(`which ${cmd}`, { stdio: 'pipe' });
+    execSync(`command -v -- ${cmd}`, { stdio: 'pipe', shell: '/bin/sh' });
     return true;
   } catch {
     return false;

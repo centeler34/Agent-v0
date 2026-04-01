@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     fn valid_path_inside_workspace() {
-        let dir = std::env::temp_dir().join("cyplex_pg_test");
+        let dir = std::env::temp_dir().join("agent_v0_pg_test"); // Already correct from previous change
         let _ = fs::create_dir_all(&dir);
 
         let inner = dir.join("subdir");
@@ -81,7 +81,7 @@ mod tests {
 
     #[test]
     fn path_outside_workspace_rejected() {
-        let dir = std::env::temp_dir().join("cyplex_pg_test2");
+        let dir = std::env::temp_dir().join("agent_v0_pg_test2"); // Already correct from previous change
         let _ = fs::create_dir_all(&dir);
 
         let guard = PathGuard::new(&dir).unwrap();

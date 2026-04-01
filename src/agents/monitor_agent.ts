@@ -5,7 +5,7 @@
 import { BaseAgent } from './base_agent.js';
 import type { TaskEnvelope, ResultEnvelope } from '../types/task_envelope.js';
 
-const SYSTEM_PROMPT = `You are the Monitor Agent for Agent Cyplex.
+const SYSTEM_PROMPT = `You are the Monitor Agent for Agent v0.
 Your capabilities include:
 - RSS and mailing list monitoring for new CVEs matching tracked technologies
 - GitHub monitoring for new public exploits against tracked targets

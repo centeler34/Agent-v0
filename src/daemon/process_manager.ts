@@ -23,6 +23,11 @@ export class ProcessManager {
       throw new Error(`Agent ${config.id} is already running`);
     }
 
+    // Validate agent ID to prevent path traversal (CWE-23) and command injection
+    if (!/^[a-z][a-z0-9_]*$/.test(config.id)) {
+      throw new Error(`Invalid agent ID: ${config.id}`);
+    }
+
     const child = spawn(process.execPath, ['--experimental-strip-types', `src/agents/${config.id}_agent.ts`], {
       cwd: process.cwd(),
       env: {

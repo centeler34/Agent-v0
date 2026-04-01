@@ -1,5 +1,5 @@
 /**
- * Cyplex Daemon — Main entry point.
+ * Agent v0 Daemon — Main entry point.
  * Binds to a Unix socket, manages agent lifecycle, and routes IPC messages.
  */
 
@@ -13,7 +13,7 @@ import { acquireLock, releaseLock, isLocked } from './lock.js';
 import type { AgentConfig, AgentRole } from '../types/agent_config.js';
 import type { TaskEnvelope, ResultEnvelope } from '../types/task_envelope.js';
 
-const logDir = path.join(process.env.HOME || '~', '.cyplex', 'logs');
+const logDir = path.join(process.env.HOME || '~', '.agent-v0', 'logs');
 const logTransports: any[] = [
   new transports.File({ filename: path.join(logDir, 'daemon.log') }),
 ];
@@ -24,7 +24,7 @@ if (process.stdout.isTTY) {
 }
 
 const logger = createLogger({
-  level: process.env.CYPLEX_LOG_LEVEL || 'info',
+  level: process.env.AGENT_V0_LOG_LEVEL || 'info',
   format: format.combine(format.timestamp(), format.json()),
   transports: logTransports,
 });
@@ -52,7 +52,7 @@ interface IpcMessage {
   payload: Record<string, unknown>;
 }
 
-export class CyplexDaemon {
+export class AgentV0Daemon {
   private server: net.Server | null = null;
   private startedAt: Date | null = null;
   private processManager: ProcessManager;

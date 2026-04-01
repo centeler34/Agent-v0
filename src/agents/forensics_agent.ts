@@ -5,7 +5,7 @@
 import { BaseAgent } from './base_agent.js';
 import type { TaskEnvelope, ResultEnvelope } from '../types/task_envelope.js';
 
-const SYSTEM_PROMPT = `You are the Forensics Agent for Agent Cyplex.
+const SYSTEM_PROMPT = `You are the Forensics Agent for Agent v0.
 Your capabilities include:
 - Log timeline reconstruction and event correlation
 - Memory dump analysis guidance (Volatility output as input)

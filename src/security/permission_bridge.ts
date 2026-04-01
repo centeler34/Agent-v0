@@ -1,5 +1,5 @@
 /**
- * TypeScript FFI bridge to cyplex-permissions Rust crate.
+ * TypeScript FFI bridge to agent-v0-permissions Rust crate.
  * MVP: pure-TS permission evaluation.
  */
 

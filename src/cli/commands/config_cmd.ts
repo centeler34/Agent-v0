@@ -6,7 +6,7 @@ import type { Command } from 'commander';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const CONFIG_PATH = path.join(process.env.HOME || '~', '.cyplex', 'config.yaml');
+const CONFIG_PATH = path.join(process.env.HOME || '~', '.agent-v0', 'config.yaml');
 
 export function registerConfigCommands(program: Command): void {
   const config = program.command('config').description('Manage configuration');
@@ -32,8 +32,13 @@ export function registerConfigCommands(program: Command): void {
 
   config.command('edit').description('Open config in $EDITOR').action(async () => {
     const editor = process.env.EDITOR || 'vi';
-    const { execSync } = await import('node:child_process');
-    execSync(`${editor} ${CONFIG_PATH}`, { stdio: 'inherit' });
+    // Validate editor is a simple command name to prevent command injection (CWE-78)
+    if (!/^[a-zA-Z0-9_/.-]+$/.test(editor)) {
+      console.error('Invalid $EDITOR value — must be a simple command name');
+      return;
+    }
+    const { execFileSync } = await import('node:child_process');
+    execFileSync(editor, [CONFIG_PATH], { stdio: 'inherit' });
   });
 
   config.command('validate').description('Validate current config').action(async () => {

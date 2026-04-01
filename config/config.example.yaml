@@ -1,15 +1,15 @@
-cyplex:
+agent-v0:
   version: "1.0"
 
   daemon:
-    socket_path: "/tmp/cyplex.sock"
-    pid_file: "/tmp/cyplex.pid"
+    socket_path: "/tmp/agent-v0.sock" # Default socket path
+    pid_file: "/tmp/agent-v0.pid" # Default PID file path
     heartbeat_interval_ms: 5000
     log_level: "info"
-    log_path: "~/.cyplex/logs/"
+    log_path: "~/.agent-v0/logs/"
 
   sessions:
-    default_workspace_root: "~/.cyplex/workspaces/"
+    default_workspace_root: "~/.agent-v0/workspaces/"
     auto_archive_after_days: 90
 
   gateway:
@@ -110,8 +110,8 @@ cyplex:
       enabled: false
 
   security:
-    audit_log_path: "~/.cyplex/audit/audit.jsonl"
-    keystore_path: "~/.cyplex/keystore.enc"
+    audit_log_path: "~/.agent-v0/audit/audit.jsonl"
+    keystore_path: "~/.agent-v0/keystore.enc"
     kdf: "argon2id"
     session_token_ttl_hours: 24
     skill_signature_verification: true

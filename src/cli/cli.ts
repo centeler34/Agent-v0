@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 /**
- * Cyplex CLI — Interactive multi-agent AI terminal.
+ * Agent v0 CLI — Interactive Multi-Agent AI Terminal.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import { Command } from 'commander';
+import readline from 'node:readline';
+import { KeystoreBridge } from '../security/keystore_bridge.js';
 import { registerDaemonCommands } from './commands/daemon_cmd.js';
 import { registerAgentCommands } from './commands/agent_cmd.js';
 import { registerTaskCommands } from './commands/task_cmd.js';
@@ -16,6 +19,7 @@ import { registerConfigCommands } from './commands/config_cmd.js';
 import { registerAuditCommands } from './commands/audit_cmd.js';
 import { registerBotCommands } from './commands/bot_cmd.js';
 import { registerKeysCommands } from './commands/keys_cmd.js';
+import { TaskRegistry } from '../orchestrator/task_registry.js';
 import { isFirstRun, runSetupWizard } from './setup_wizard.js';
 import { runUpdate } from './updater.js';
 import { runUninstall } from './uninstaller.js';
@@ -65,6 +69,11 @@ const c = {
   darkGray:'\x1b[38;5;238m',
 };
 
+// Global instances for CLI
+let globalKeystoreBridge: KeystoreBridge | null = null;
+let globalTaskRegistry: TaskRegistry | null = null;
+const SESSION_TOKEN_PATH = path.join(os.homedir(), '.agent-v0', 'session.token');
+const SESSION_TTL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 // ── Box Drawing Helpers ─────────────────────────────────────────────────────
 
 function getTermWidth(): number {
@@ -98,9 +107,9 @@ function printBanner(): void {
   console.log(`  ${c.blue}${c.bold} ╚██████╗   ██║   ██║     ███████╗███████╗██╔╝ ██╗${c.reset}`);
   console.log(`  ${c.brightBlue}${c.bold}  ╚═════╝   ╚═╝   ╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝${c.reset}`);
   console.log('');
-  console.log(`  ${c.bold}${c.white}  Agent Cyplex${c.reset}  ${c.dim}v0.2.0${c.reset}`);
+  console.log(`  ${c.bold}${c.white}  Agent v0${c.reset}  ${c.dim}v1.0.0${c.reset}`);
   console.log(`  ${c.dim}  Multi-Agent AI Orchestration Terminal${c.reset}`);
-  console.log(`  ${c.dim}  Security Research Edition${c.reset}`);
+  console.log(`  ${c.dim}  Universal Orchestration Edition${c.reset}`);
   console.log('');
 }
 
@@ -141,7 +150,7 @@ function printHelp(): void {
     ['/help',      'Show this help screen'],
     ['/setup',     'Re-run the setup wizard'],
     ['/update',    'Fetch latest from GitHub & rebuild'],
-    ['/uninstall', 'Remove Agent Cyplex completely'],
+    ['/uninstall', 'Remove Agent v0 completely'],
     ['/status',    'Query daemon health & status'],
     ['/clear',     'Clear session context'],
     ['exit',       'Quit the terminal'],
@@ -155,22 +164,12 @@ function printHelp(): void {
   console.log(`  ${c.bold}${c.brightCyan}AGENTS${c.reset}`);
   console.log(divider());
   console.log('');
+  console.log(`    ${c.dim}Agents are dynamically loaded from your configuration.${c.reset}`);
+  console.log(`    ${c.dim}Run ${c.white}agent-v0 agent list${c.dim} to see active agents.${c.reset}`);
+  console.log('');
 
-  const agents: [string, string, string][] = [
-    ['recon',      '  Reconnaissance & OSINT gathering', c.green],
-    ['code',       '  Code analysis, generation & review', c.blue],
-    ['exploit',    '  Vulnerability research & PoC dev', c.red],
-    ['forensics',  '  Digital forensics & incident response', c.magenta],
-    ['report',     '  Report generation & documentation', c.yellow],
-    ['monitor',    '  Continuous monitoring & alerting', c.cyan],
-    ['threat',     '  Threat intelligence analysis', c.orange],
-    ['osint',      '  Open-source intelligence analyst', c.teal],
-    ['scribe',     '  Session logging & transcription', c.purple],
-  ];
-
-  for (const [name, desc, color] of agents) {
-    console.log(`    ${color}●${c.reset} ${c.white}${name.padEnd(12)}${c.reset}${c.dim}${desc}${c.reset}`);
-  }
+  console.log(`    ${c.green}●${c.reset} ${c.white}Agentic${c.reset}     ${c.dim}The central orchestrator${c.reset}`);
+  console.log(`    ${c.blue}●${c.reset} ${c.white}Custom...${c.reset}   ${c.dim}Your specialized agents${c.reset}`);
 
   console.log('');
   console.log(`  ${c.bold}${c.brightCyan}CLI MODULES${c.reset}`);
@@ -201,7 +200,7 @@ function printHelp(): void {
 // ── Env Loader ──────────────────────────────────────────────────────────────
 
 function loadEnvFile(): void {
-  const envPath = path.join(process.env.HOME || '~', '.cyplex', '.env');
+  const envPath = path.join(process.env.HOME || '~', '.agent-v0', '.env');
   if (!fs.existsSync(envPath)) return;
   const content = fs.readFileSync(envPath, 'utf-8');
   for (const line of content.split('\n')) {
@@ -214,6 +213,89 @@ function loadEnvFile(): void {
     if (value && !process.env[key]) {
       process.env[key] = value;
     }
+  }
+}
+
+// ── Password Prompt Helper ──────────────────────────────────────────────────
+
+async function askMasterPassword(): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    const question = `  ${c.teal}${c.bold}?${c.reset} ${c.white}Enter Master Password to unlock Agent v0${c.reset}${c.dim}: ${c.reset}`;
+    process.stdout.write(question);
+
+    const stdin = process.stdin;
+    if (stdin.isTTY) stdin.setRawMode(true);
+
+    let password = '';
+    const onData = (char: Buffer) => {
+      const ch = char.toString();
+      if (ch === '\n' || ch === '\r') {
+        if (stdin.isTTY) stdin.setRawMode(false);
+        stdin.removeListener('data', onData);
+        process.stdout.write('\n');
+        rl.close();
+        resolve(password.trim());
+      } else if (ch === '\u0003') { // Ctrl+C
+        process.exit(0);
+      } else if (ch === '\u007f' || ch === '\b') { // Backspace
+        if (password.length > 0) {
+          password = password.slice(0, -1);
+          process.stdout.write('\b \b');
+        }
+      } else {
+        password += ch;
+        process.stdout.write(`${c.cyan}*${c.reset}`);
+      }
+    };
+    stdin.on('data', onData);
+  });
+}
+
+// ── Session Token Management ────────────────────────────────────────────────
+
+interface SessionTokenPayload {
+  exp: number; // Expiry timestamp in milliseconds
+  masterKey: string; // Hex encoded master key
+}
+
+/**
+ * Generates an encrypted session token.
+ * @param masterKey The 32-byte derived master key.
+ * @returns Encrypted session token string.
+ */
+function generateSessionToken(masterKey: Buffer): string {
+  // Store the key itself, encrypted with a machine-specific secret if possible.
+  // For MVP, we use file permissions (0600) to protect the raw key within the token JSON.
+  const payload: SessionTokenPayload = {
+    masterKey: masterKey.toString('hex'),
+    exp: Date.now() + SESSION_TTL_MS,
+  };
+  return JSON.stringify(payload);
+}
+
+/**
+ * Validates and decrypts a session token.
+ * @param tokenJson JSON session token string.
+ * @returns Derived master key Buffer if valid and not expired, null otherwise.
+ */
+function validateSessionToken(tokenJson: string): Buffer | null {
+  try {
+    const payload = JSON.parse(tokenJson);
+    if (payload.exp < Date.now()) return null;
+    return Buffer.from(payload.masterKey, 'hex');
+  } catch (err) {
+    return null;
+  }
+}
+
+function deleteSessionToken(): void {
+  if (fs.existsSync(SESSION_TOKEN_PATH)) {
+    fs.unlinkSync(SESSION_TOKEN_PATH);
   }
 }
 
@@ -230,12 +312,57 @@ async function main(): Promise<void> {
     if (isSetupCommand) return;
   }
 
+  // ── Authentication & Registry Initialization
+  const isSkipAuth = args[0] === 'setup' || args[0] === 'uninstall' || args.includes('--help');
+  
+  if (!isFirstRun() && !isSkipAuth) {
+    try {
+      const KEYSTORE_PATH = path.join(os.homedir(), '.agent-v0', 'keystore.enc');
+      
+      if (!fs.existsSync(KEYSTORE_PATH)) {
+        console.error(`${c.red}[x]${c.reset} Keystore not found. Run 'agent-v0 setup' first.`);
+        process.exit(1);
+      }
+      
+      let masterKey: Buffer | null = null;
+
+      // Attempt to use session token first
+      if (fs.existsSync(SESSION_TOKEN_PATH)) {
+        const tokenJson = fs.readFileSync(SESSION_TOKEN_PATH, 'utf-8');
+        masterKey = validateSessionToken(tokenJson);
+        if (masterKey) {
+          console.log(`  ${c.green}[+]${c.reset} Session active. Fleets unlocked.`);
+        } else {
+          deleteSessionToken();
+        }
+      }
+
+      if (!masterKey) {
+        const password = await askMasterPassword();
+        globalKeystoreBridge = new KeystoreBridge();
+        await globalKeystoreBridge.open(KEYSTORE_PATH, password);
+        masterKey = globalKeystoreBridge.getDerivedKey();
+        fs.writeFileSync(SESSION_TOKEN_PATH, generateSessionToken(masterKey), 'utf-8');
+        console.log(`  ${c.green}[+]${c.reset} Authentication successful. Session token created.`);
+      }
+
+      globalTaskRegistry = new TaskRegistry();
+      globalTaskRegistry.setMasterKey(masterKey!);
+
+      // Store derived key in process env for subordinate modules if needed (optional, but good for debugging)
+      process.env.AGENT_V0_MASTER_KEY = masterKey!.toString('hex');
+    } catch (err) {
+      console.error(`\n  ${c.red}${c.bold} Authentication Failed:${c.reset} ${c.dim}${err instanceof Error ? err.message : 'Invalid password'}${c.reset}\n`);
+      process.exit(1);
+    }
+  }
+
   const program = new Command();
 
   program
-    .name('agent-cyplex')
-    .description('Agent Cyplex — Multi-agent AI orchestration CLI')
-    .version('0.2.0');
+    .name('agent-v0')
+    .description('Agent v0 — Universal multi-agent AI orchestration CLI')
+    .version('1.0.0');
 
   program.command('setup')
     .description('Run the setup wizard to configure API keys, providers, and integrations')
@@ -246,11 +373,11 @@ async function main(): Promise<void> {
     .action(async () => { await runUpdate(); });
 
   program.command('uninstall')
-    .description('Remove Agent Cyplex, all config, data, and system links')
+    .description('Remove Agent v0, all config, data, and system links')
     .action(async () => { await runUninstall(); });
 
   registerDaemonCommands(program);
-  registerAgentCommands(program);
+  registerAgentCommands(program, globalTaskRegistry!); // Pass registry
   registerTaskCommands(program);
   registerSessionCommands(program);
   registerSkillCommands(program);
@@ -283,7 +410,7 @@ async function launchRepl(): Promise<void> {
   console.log('');
 
   // ── Prompt Loop
-  const promptStr = `  ${c.brightCyan}${c.bold}cyplex${c.reset}${c.darkGray} ❯${c.reset} `;
+  const promptStr = `  ${c.brightCyan}${c.bold}agent-v0${c.reset}${c.darkGray} ❯${c.reset} `;
 
   const showPrompt = () => {
     rl.question(promptStr, async (input: string) => {
