@@ -1,5 +1,5 @@
 /**
- * Agent Cyplex — Self-Updater
+ * Agent v0 — Self-Updater
  * Fetches latest code from GitHub, rebuilds all components, and restarts the CLI.
  */
 
@@ -45,7 +45,7 @@ function getInstallDir(): string {
   const scriptDir = path.dirname(new URL(import.meta.url).pathname);
   const repoRoot = path.resolve(scriptDir, '..', '..');
   // Also check the standard install location
-  const homeInstall = path.join(process.env.HOME || '~', '.agent-cyplex');
+  const homeInstall = path.join(process.env.HOME || '~', '.agent-v0');
   if (fs.existsSync(path.join(repoRoot, 'package.json'))) return repoRoot;
   if (fs.existsSync(path.join(homeInstall, 'package.json'))) return homeInstall;
   return repoRoot;
@@ -56,14 +56,14 @@ export async function runUpdate(): Promise<void> {
 
   console.log('');
   console.log(`${CYAN}${'─'.repeat(60)}${NC}`);
-  console.log(`${BOLD}  Agent Cyplex — Update${NC}`);
+  console.log(`${BOLD}  Agent v0 — Update${NC}`);
   console.log(`${CYAN}${'─'.repeat(60)}${NC}`);
   console.log('');
 
   // Check if it's a git repo
   if (!fs.existsSync(path.join(installDir, '.git'))) {
     error(`No git repository found at ${installDir}`);
-    error('Cannot update — was Agent Cyplex installed from source?');
+    error('Cannot update — was Agent v0 installed from source?');
     return;
   }
 
