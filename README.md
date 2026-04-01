@@ -391,11 +391,10 @@ skills/
 
 Custom skills can be loaded at runtime and are verified via cryptographic signatures and YARA scanning before execution.
 
----
 
 ## Bot Integrations
 
-Agent Cyplex supports receiving tasks from chat platforms:
+Agent v0 supports receiving tasks from chat platforms:
 
 - **Telegram** — via grammy SDK
 - **Discord** — via discord.js
@@ -403,7 +402,6 @@ Agent Cyplex supports receiving tasks from chat platforms:
 
 All incoming messages are normalized to a unified format, routed through the Agentic orchestrator, and responses are sent back to the originating channel. Bot access is controlled via allowlists and rate limiting.
 
----
 
 ## Project Structure
 

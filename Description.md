@@ -1,4 +1,4 @@
-# Agent Cyplex — Product Specification
+# Agent v0 — Product Specification
 
 > A multi-agent AI orchestration CLI terminal for security researchers, developers, and power users.
 
@@ -12,7 +12,7 @@
 4. [CLI Command Structure](#4-cli-command-structure)
 5. [Bot Integrations](#5-bot-integrations)
 6. [Security Architecture](#6-security-architecture)
-7. [Skills System — CyplexHub](#7-skills-system--cyplexhub)
+7. [Skills System — v0 Hub](#7-skills-system--v0-hub)
 8. [Tech Stack](#8-tech-stack)
 9. [Configuration File Structure](#9-configuration-file-structure)
 10. [Roadmap](#10-roadmap)
@@ -22,9 +22,9 @@
 
 ## 1. Project Overview
 
-Agent Cyplex is a multi-agent AI orchestration CLI terminal tool designed for security researchers, developers, and power users who need coordinated AI assistance across complex, parallelizable workflows.
+Agent v0 is a multi-agent AI orchestration CLI terminal tool designed for security researchers, developers, and power users who need coordinated AI assistance across complex, parallelizable workflows.
 
-Rather than a single AI answering queries sequentially, Cyplex deploys a fleet of specialized agents under a top-level orchestrator called **Agentic**. Agentic receives the user's intent, decomposes it into discrete subtasks, and dispatches those tasks concurrently to subordinate agents — each running in its own isolated sandbox, with its own AI model backend, permissions, and designated workspace directory.
+Rather than a single AI answering queries sequentially, Agent v0 deploys a fleet of specialized agents under a top-level orchestrator called **Agentic**. Agentic receives the user's intent, decomposes it into discrete subtasks, and dispatches those tasks concurrently to subordinate agents — each running in its own isolated sandbox, with its own AI model backend, permissions, and designated workspace directory.
 
 ### Design Principles
 
@@ -37,7 +37,7 @@ Rather than a single AI answering queries sequentially, Cyplex deploys a fleet o
 
 ### Inspiration
 
-Agent Cyplex draws architectural inspiration from **OpenClaw** (formerly Clawdbot/Moltbot) — specifically its gateway-based provider routing, YAML skill registry (ClawHub), multi-channel bot integration, and persistent daemon model. Cyplex extends these patterns with a strict hierarchical agent model, OS-level process sandboxing, a hash-chained audit trail, and deeper security tooling oriented toward offensive and defensive security research.
+Agent v0 draws architectural inspiration from **OpenClaw** (formerly Clawdbot/Moltbot) — specifically its gateway-based provider routing, YAML skill registry (ClawHub), multi-channel bot integration, and persistent daemon model. Agent v0 extends these patterns with a strict hierarchical agent model, OS-level process sandboxing, a hash-chained audit trail, and deeper security tooling oriented toward offensive and defensive security research.
 
 ---
 
@@ -135,7 +135,7 @@ Supported provider backends:
 
 ### 2.5 Persistent Daemon
 
-Cyplex runs as a background daemon process:
+Agent v0 runs as a background daemon process:
 
 ```
 cyplex daemon start    # Start daemon, bind to Unix socket
