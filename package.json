@@ -1,6 +1,6 @@
 {
-  "name": "@centeler34/agent-v0",
-  "version": "1.2.0",
+  "name": "agent-v0",
+  "version": "1.0.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/centeler34/Agent-v0.git"
@@ -29,18 +29,21 @@
     "better-sqlite3": "^12.8.0",
     "commander": "^14.0.3",
     "discord.js": "^14.26.0",
+    "express": "^4.21.2",
     "grammy": "^1.41.1",
     "ink": "^6.8.0",
     "ink-spinner": "^5.0.0",
     "openai": "^6.33.0",
     "p-queue": "^9.1.0",
     "react": "^19.2.4",
+    "socket.io": "^4.8.1",
     "winston": "^3.19.0",
     "yaml": "^2.8.3",
     "zod": "^3.25.67"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.15.0",
     "@types/react": "^19.2.14",
     "eslint": "^9.28.0",

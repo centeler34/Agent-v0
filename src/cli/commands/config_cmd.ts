@@ -2,6 +2,7 @@
  * `cyplex config` subcommands.
  */
 
+import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 import type { Command } from 'commander';
 import fs from 'node:fs';
 import path from 'node:path';

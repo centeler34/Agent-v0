@@ -2,6 +2,7 @@
  * `cyplex bot` subcommands.
  */
 
+import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 import type { Command } from 'commander';
 
 export function registerBotCommands(program: Command): void {

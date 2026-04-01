@@ -1,7 +1,6 @@
 /**
  * In-memory + SQLite task state store.
  */
-
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import os from 'node:os';

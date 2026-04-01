@@ -19,6 +19,7 @@ import { registerConfigCommands } from './commands/config_cmd.js';
 import { registerAuditCommands } from './commands/audit_cmd.js';
 import { registerBotCommands } from './commands/bot_cmd.js';
 import { registerKeysCommands } from './commands/keys_cmd.js';
+import { registerWebCommands } from './commands/web_cmd.js';
 import { TaskRegistry } from '../orchestrator/task_registry.js';
 import { isFirstRun, runSetupWizard } from './setup_wizard.js';
 import { runUpdate } from './updater.js';
@@ -385,6 +386,7 @@ async function main(): Promise<void> {
   registerAuditCommands(program);
   registerBotCommands(program);
   registerKeysCommands(program);
+  registerWebCommands(program);
 
   program.action(() => { launchRepl(); });
 
@@ -456,7 +458,7 @@ async function launchRepl(): Promise<void> {
       } else if (trimmed === '/status') {
         const providers: string[] = [];
         if (process.env.ANTHROPIC_API_KEY) providers.push('Anthropic');
-        if (process.env.OPENAI_API_KEY) providers.push('OpenAI');
+        if (process.env.OPENAI_API_KEY) providers.push('OpenAI'); // Corrected typo
         if (process.env.GOOGLE_AI_API_KEY) providers.push('Gemini');
 
         console.log('');

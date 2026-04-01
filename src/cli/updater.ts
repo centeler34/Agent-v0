@@ -7,6 +7,7 @@ import { execSync, spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 
+import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 const CYAN = '\x1b[36m';
 const GREEN = '\x1b[32m';
 const YELLOW = '\x1b[33m';
