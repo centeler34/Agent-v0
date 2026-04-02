@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 export interface IntakeResult {
   success: boolean;
@@ -14,7 +14,8 @@ export interface IntakeResult {
   error?: string;
 }
 
-const QUARANTINE_BASE = path.join(process.env.HOME || '~', '.cyplex', 'quarantine');
+import os from 'node:os';
+const QUARANTINE_BASE = path.join(os.homedir(), '.cyplex', 'quarantine');
 const QUARANTINE_DIR = path.join(QUARANTINE_BASE, 'pending');
 
 function ensureQuarantineDir(): void {
@@ -115,15 +116,15 @@ export function intakeFromPicker(): IntakeResult[] {
 
   try {
     if (platform === 'linux') {
-      const result = execSync('zenity --file-selection --multiple --file-filter="YAML files|*.yaml *.yml" 2>/dev/null', {
-        encoding: 'utf-8',
-      });
+      const result = execFileSync('zenity', [
+        '--file-selection', '--multiple',
+        '--file-filter=YAML files|*.yaml *.yml',
+      ], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
       files = result.trim().split('|');
     } else if (platform === 'darwin') {
-      const result = execSync(
-        'osascript -e \'choose file of type {"yaml","yml"} with multiple selections allowed\'',
-        { encoding: 'utf-8' },
-      );
+      const result = execFileSync('osascript', [
+        '-e', 'choose file of type {"yaml","yml"} with multiple selections allowed',
+      ], { encoding: 'utf-8' });
       files = result.trim().split(', ').map((f) => f.replace('alias ', ''));
     }
   } catch {
@@ -149,17 +150,27 @@ function quarantineContent(content: string, source: string): IntakeResult {
   assertWithinDir(quarantinePath, QUARANTINE_DIR);
   assertWithinDir(metaPath, QUARANTINE_DIR);
 
-  // Write skill file
-  fs.writeFileSync(quarantinePath, content, 'utf-8');
+  // Write skill file atomically (O_CREAT|O_EXCL prevents TOCTOU race)
+  const fd = fs.openSync(quarantinePath, 'wx');
+  try {
+    fs.writeSync(fd, content, 0, 'utf-8');
+  } finally {
+    fs.closeSync(fd);
+  }
 
-  // Write metadata alongside
+  // Write metadata alongside (also exclusive-create)
   const meta = {
     source,
     hash,
     quarantined_at: new Date().toISOString(),
     status: 'pending_scan',
   };
-  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+  const metaFd = fs.openSync(metaPath, 'wx');
+  try {
+    fs.writeSync(metaFd, JSON.stringify(meta, null, 2), 0, 'utf-8');
+  } finally {
+    fs.closeSync(metaFd);
+  }
 
   return { success: true, quarantinePath, hash };
 }

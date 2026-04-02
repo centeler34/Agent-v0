@@ -5,10 +5,10 @@
  * It runs silently — all output goes to the log file.
  */
 
-import { CyplexDaemon } from './daemon.js';
+import { AgentV0Daemon } from './daemon.js';
 
 const args = process.argv.slice(2);
-let socketPath = '/tmp/cyplex.sock';
+let socketPath = '/tmp/agent-v0.sock';
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--socket' && args[i + 1]) {
@@ -16,15 +16,15 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-const daemon = new CyplexDaemon({
+const daemon = new AgentV0Daemon({
   socketPath,
-  pidFile: '/tmp/cyplex.pid',
+  pidFile: '/tmp/agent-v0.pid',
   heartbeatIntervalMs: 5000,
-  logLevel: process.env.CYPLEX_LOG_LEVEL || 'info',
+  logLevel: process.env.AGENT_V0_LOG_LEVEL || 'info',
   agents: {},
 });
 
-daemon.start().catch((err) => {
-  console.error('Daemon failed to start:', err);
+daemon.start().catch((err: Error) => {
+  console.error('Daemon failed to start:', err.message);
   process.exit(1);
 });

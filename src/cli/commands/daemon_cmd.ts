@@ -18,7 +18,20 @@ const DIM = '\x1b[2m';
 const NC = '\x1b[0m';
 
 const PID_FILE = '/tmp/agent-v0.pid';
-const LOG_DIR = path.join(process.env.HOME || '~', '.agent-v0', 'logs');
+
+function safeHomeDir(): string {
+  const home = process.env.HOME;
+  if (!home || !path.isAbsolute(home) || !fs.existsSync(home)) {
+    const fallback = require('node:os').homedir();
+    if (!fallback || !path.isAbsolute(fallback)) {
+      throw new Error('Cannot determine a valid home directory');
+    }
+    return fallback;
+  }
+  return home;
+}
+
+const LOG_DIR = path.join(safeHomeDir(), '.agent-v0', 'logs');
 
 function isDaemonRunning(): { running: boolean; pid?: number } {
   if (!fs.existsSync(PID_FILE)) return { running: false };

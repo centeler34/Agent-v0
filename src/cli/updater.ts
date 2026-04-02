@@ -8,6 +8,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 import crypto from 'node:crypto'; // Added for crypto.randomUUID()
+import os from 'node:os';
 const CYAN = '\x1b[36m';
 const GREEN = '\x1b[32m';
 const YELLOW = '\x1b[33m';
@@ -46,7 +47,7 @@ function getInstallDir(): string {
   const scriptDir = path.dirname(new URL(import.meta.url).pathname);
   const repoRoot = path.resolve(scriptDir, '..', '..');
   // Also check the standard install location
-  const homeInstall = path.join(process.env.HOME || '~', '.agent-v0');
+  const homeInstall = path.join(os.homedir(), '.agent-v0');
   if (fs.existsSync(path.join(repoRoot, 'package.json'))) return repoRoot;
   if (fs.existsSync(path.join(homeInstall, 'package.json'))) return homeInstall;
   return repoRoot;
@@ -150,15 +151,10 @@ export async function runUpdate(): Promise<void> {
     run('git pull origin main --ff-only', installDir);
     success('Code updated');
   } catch {
-    // If fast-forward fails, try a reset
-    warn('Fast-forward merge failed, resetting to remote...');
-    try {
-      run('git reset --hard origin/main', installDir);
-      success('Code updated (reset to remote)');
-    } catch (e) {
-      error(`Failed to update code: ${e}`);
-      return;
-    }
+    warn('Fast-forward merge failed. Local changes may conflict with upstream.');
+    warn('Please resolve conflicts manually or run: git stash && git pull origin main');
+    error('Automatic update aborted to protect local changes.');
+    return;
   }
 
   const newHash = run('git rev-parse --short HEAD', installDir);
@@ -175,16 +171,16 @@ export async function runUpdate(): Promise<void> {
   try {
     run('npm install', installDir);
     success('  Dependencies installed');
-  } catch (e) {
-    error(`  npm install failed: ${e}`);
+  } catch {
+    error('  npm install failed. Check logs for details.');
   }
 
   info('  Compiling TypeScript...');
   try {
     run('npx tsc', installDir);
     success('  TypeScript compiled');
-  } catch (e) {
-    error(`  TypeScript build failed: ${e}`);
+  } catch {
+    error('  TypeScript build failed. Check logs for details.');
   }
 
   // Rust (if cargo is available)
@@ -193,8 +189,8 @@ export async function runUpdate(): Promise<void> {
     try {
       run('cargo build --release', installDir);
       success('  Rust crates built');
-    } catch (e) {
-      warn(`  Rust build skipped: ${e}`);
+    } catch {
+      warn('  Rust build skipped (build failed).');
     }
   }
 
@@ -206,8 +202,8 @@ export async function runUpdate(): Promise<void> {
       if (!fs.existsSync(goDistDir)) fs.mkdirSync(goDistDir, { recursive: true });
       run('go build -o ../../dist/go/net-probe .', path.join(installDir, 'go', 'net-probe'));
       success('  Go utilities built');
-    } catch (e) {
-      warn(`  Go build skipped: ${e}`);
+    } catch {
+      warn('  Go build skipped (build failed).');
     }
   }
 
