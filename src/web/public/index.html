@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent v0 | Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <!-- Auth Overlay -->
+    <div id="auth" class="auth-overlay">
+        <div class="auth-card">
+            <h2 class="auth-title">AGENT V0</h2>
+            <p class="auth-subtitle">Enter Master Password to unlock</p>
+            <div id="auth-error" class="auth-error" style="display:none"></div>
+            <input type="password" id="passInput" placeholder="Password..." onkeydown="if(event.key==='Enter') login()">
+            <button onclick="login()" class="btn-primary">Unlock Fleet</button>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div class="container">
+        <header>
+            <div class="logo">AGENT V0 <span class="version">v1.2.2</span></div>
+            <div class="header-right">
+                <div id="connection-status" class="status-disconnected">
+                    <span class="status-dot"></span> <span id="conn-text">CONNECTING...</span>
+                </div>
+                <div id="stats" class="stats" style="display:none">
+                    <span id="stat-tasks" class="stat-item">0 tasks</span>
+                    <span id="stat-agents" class="stat-item">0 agents</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="sidebar">
+            <h4 class="section-title">Agents</h4>
+            <div id="agent-list">
+                <p class="muted small">Unlock to view agents</p>
+            </div>
+
+            <h4 class="section-title" style="margin-top: 30px">Quick Actions</h4>
+            <button class="btn-action" onclick="sendQuick('status')">Daemon Status</button>
+            <button class="btn-action" onclick="sendQuick('agent list')">List Agents</button>
+            <button class="btn-action" onclick="sendQuick('task list')">List Tasks</button>
+            <button class="btn-action" onclick="sendQuick('audit query --last 1h')">Recent Audit</button>
+        </div>
+
+        <div class="main">
+            <div class="terminal" id="output">
+                <div class="muted">-- Agent v0 Web Dashboard --</div>
+                <div class="muted">-- Authenticate to begin orchestration --</div>
+            </div>
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <span class="input-prompt">&gt;</span>
+                    <input type="text" id="cmdInput" placeholder="Type a command or natural language intent..." onkeydown="if(event.key==='Enter') sendCmd()" disabled>
+                </div>
+            </div>
+        </div>
+
+        <div class="tasks-panel">
+            <h4 class="section-title">Active Tasks</h4>
+            <div id="task-list">
+                <p class="muted small">No active tasks</p>
+            </div>
+
+            <h4 class="section-title" style="margin-top: 30px">Task History</h4>
+            <div id="task-history">
+                <p class="muted small">No completed tasks</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>
