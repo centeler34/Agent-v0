@@ -66,6 +66,15 @@ export class TaskRegistry {
         FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE,
         FOREIGN KEY (depends_on_id) REFERENCES tasks(task_id) ON DELETE CASCADE
       );
+
+      CREATE TABLE IF NOT EXISTS memories (
+        memory_id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        description TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
     `);
   }
 
@@ -267,6 +276,41 @@ export class TaskRegistry {
     
     this.db.exec(`DELETE FROM task_dependencies WHERE task_id NOT IN (SELECT task_id FROM tasks) OR depends_on_id NOT IN (SELECT task_id FROM tasks)`);
     return result.changes;
+  }
+
+  addMemory(type: string, content: string, description?: string): void {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const encryptedContent = this.encrypt(content);
+    this.db.prepare(`
+      INSERT INTO memories (memory_id, type, content, description, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, type, encryptedContent, description || null, now, now);
+  }
+
+  getMemories(type?: string): any[] {
+    let stmt;
+    if (type) {
+      stmt = this.db.prepare('SELECT * FROM memories WHERE type = ? ORDER BY updated_at DESC');
+      const rows = stmt.all(type) as any[];
+      return rows.map(r => ({ ...r, content: this.decrypt(r.content) }));
+    } else {
+      stmt = this.db.prepare('SELECT * FROM memories ORDER BY updated_at DESC');
+      const rows = stmt.all() as any[];
+      return rows.map(r => ({ ...r, content: this.decrypt(r.content) }));
+    }
+  }
+
+  deleteMemory(memoryId: string): void {
+    this.db.prepare('DELETE FROM memories WHERE memory_id = ?').run(memoryId);
+  }
+
+  /**
+   * Deletes all memories from the database.
+   */
+  clearAllMemories(): void {
+    this.db.prepare('DELETE FROM memories').run();
+    console.log('All memories cleared from TaskRegistry.');
   }
 
   stats(): { total: number; pending: number; running: number; completed: number; failed: number } {

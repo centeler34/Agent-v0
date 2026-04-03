@@ -16,6 +16,7 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import { TaskRegistry } from '../orchestrator/task_registry.js';
+import { MemoryManager } from '../orchestrator/memory_manager.js';
 import { KeystoreBridge } from '../security/keystore_bridge.js';
 
 const app = express();
@@ -70,6 +71,7 @@ const publicDir = path.resolve(scriptDir, 'public');
 app.use(express.static(publicDir));
 
 let registry: TaskRegistry | null = null;
+let memoryManager: MemoryManager | null = null;
 
 // ── Rate Limiter ──────────────────────────────────────────────────────────
 
@@ -128,6 +130,7 @@ io.on('connection', (socket: import('socket.io').Socket) => {
         registry = new TaskRegistry();
       }
       registry.setMasterKey(masterKey);
+      memoryManager = new MemoryManager(registry);
       authenticatedSockets.add(socket.id);
 
       // Fetch live agent status from daemon to populate UI
@@ -197,6 +200,56 @@ io.on('connection', (socket: import('socket.io').Socket) => {
     client.on('error', () => {
       client.destroy();
     });
+  });
+
+  // Memory Management
+  socket.on('get_memories', () => {
+    if (!authenticatedSockets.has(socket.id) || !registry) return;
+    socket.emit('memories_list', registry.getMemories());
+  });
+
+  socket.on('save_memory', (data: any) => {
+    if (!authenticatedSockets.has(socket.id) || !memoryManager || !registry) return;
+    try {
+      const { type, fact, why, howToApply } = data;
+      memoryManager.saveMemory(type, fact, why, howToApply);
+      socket.emit('memory_saved', { success: true });
+      socket.emit('memories_list', registry.getMemories());
+    } catch (err) {
+      socket.emit('memory_error', { message: 'Failed to save memory' });
+    }
+  });
+
+  socket.on('delete_memory', (data: { id: string }) => {
+    if (!authenticatedSockets.has(socket.id) || !registry) return;
+    try {
+      registry.deleteMemory(data.id);
+      socket.emit('memories_list', registry.getMemories());
+    } catch (err) {
+      socket.emit('memory_error', { message: 'Failed to delete memory' });
+    }
+  });
+
+  // Clear All Memories
+  socket.on('clear_all_memories', () => {
+    if (!authenticatedSockets.has(socket.id) || !registry) return;
+    try {
+      registry.clearAllMemories();
+      socket.emit('memories_cleared', { success: true });
+    } catch (err) {
+      socket.emit('memory_error', { message: 'Failed to clear all memories' });
+    }
+  });
+
+  // Search Memories
+  socket.on('search_memories', (data: { query: string }) => {
+    if (!authenticatedSockets.has(socket.id) || !memoryManager) return;
+    try {
+      const filteredMemories = memoryManager.searchMemories(data.query);
+      socket.emit('memories_search_results', filteredMemories);
+    } catch (err) {
+      socket.emit('memory_error', { message: 'Failed to search memories' });
+    }
   });
 
   // Task Submission — proxy to daemon via Unix socket

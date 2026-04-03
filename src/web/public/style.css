@@ -37,8 +37,40 @@ header {
 .logo { font-weight: 800; color: var(--accent); letter-spacing: -1px; }
 .version { color: var(--muted); font-weight: normal; font-size: 0.75rem; margin-left: 8px; }
 
+.header-right { display: flex; align-items: center; gap: 20px; }
+.stats { display: flex; gap: 15px; font-size: 0.8rem; color: var(--muted); }
+.stat-item { background: var(--bg-main); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); }
+
 .sidebar { background: var(--bg-side); border-right: 1px solid var(--border); padding: 20px; }
 .main { display: flex; flex-direction: column; background: var(--bg-main); }
+
+.section-title { 
+    font-size: 0.7rem; 
+    text-transform: uppercase; 
+    color: var(--muted); 
+    margin-bottom: 12px; 
+    letter-spacing: 1px; 
+}
+
+.btn-action { 
+    width: 100%; 
+    text-align: left; 
+    background: transparent; 
+    border: none; 
+    color: var(--text); 
+    padding: 8px 0; 
+    font-size: 0.85rem; 
+    cursor: pointer; 
+    opacity: 0.8;
+}
+.btn-action:hover { opacity: 1; color: var(--accent); }
+
+.tab-nav { display: flex; border-bottom: 1px solid var(--border); }
+.tab-button { background: var(--bg-card); border: none; padding: 12px 20px; color: var(--muted); cursor: pointer; font-weight: 500; transition: all 0.2s; }
+.tab-button.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+.tab-content { flex: 1; display: none; flex-direction: column; } /* Hidden by default */
+
+.tasks-panel { background: var(--bg-side); border-left: 1px solid var(--border); padding: 20px; }
 
 .terminal { 
     flex: 1; 
@@ -102,4 +134,138 @@ input {
     cursor: pointer; 
 }
 
+.btn-primary-small { 
+    background: var(--accent); 
+    border: none; 
+    color: black; 
+    font-weight: bold; 
+    border-radius: 6px; 
+    padding: 6px 12px;
+    cursor: pointer; 
+}
+
+.status-dot { 
+    display: inline-block; 
+    width: 8px; 
+    height: 8px; 
+    border-radius: 50%; 
+    margin-right: 6px; 
+    background: #3f3f46; 
+}
+.status-connected .status-dot, .online { background: var(--success); box-shadow: 0 0 10px var(--success); }
+.busy { 
+    background: #fde047; 
+    box-shadow: 0 0 10px #fde047;
+    animation: pulse-busy 2s infinite ease-in-out;
+}
+.status-disconnected .status-dot, .offline { background: var(--error); }
+
 @keyframes blink { 50% { opacity: 0; } }
+@keyframes pulse-busy {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.25); opacity: 0.6; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.memory-controls { 
+    padding: 20px; 
+    display: flex; 
+    gap: 12px; 
+    border-bottom: 1px solid var(--border); 
+}
+
+/* ── Memory Search & Modal Styles ────────────────────────────────────────── */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    display: none; /* Controlled by JS */
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 500px;
+    max-width: 90vw;
+    padding: 24px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.modal-card h2 { margin-top: 0; color: var(--accent); font-size: 1.25rem; }
+
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+
+.form-group input, .form-group textarea, .form-group select {
+    width: 100%;
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 10px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+.btn-secondary { flex: 1; background: transparent; border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 6px; cursor: pointer; }
+.btn-secondary:hover { background: rgba(255,255,255,0.05); }
+
+/* Memory List */
+.memory-list {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.memory-item.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.badge-user {
+    background: #00f2ff33; /* Cyan with transparency */
+    color: var(--accent);
+}
+
+.badge-feedback {
+    background: #10b98133; /* Green with transparency */
+    color: var(--success);
+}
+
+.badge-project {
+    background: #fde04733; /* Yellow with transparency */
+    color: #fde047;
+}
+
+.badge-reference {
+    background: #a78bfa33; /* Purple with transparency */
+    color: #a78bfa;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+}
