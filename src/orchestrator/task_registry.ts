@@ -254,6 +254,21 @@ export class TaskRegistry {
     return result.changes > 0;
   }
 
+  /**
+   * Securely removes cancelled, failed, or timed-out tasks.
+   * Also prunes the task_dependencies table of orphan records.
+   */
+  cleanup(): number {
+    const deleteStmt = this.db.prepare(`
+      DELETE FROM tasks 
+      WHERE status IN ('cancelled', 'failed', 'timeout')
+    `);
+    const result = deleteStmt.run();
+    
+    this.db.exec(`DELETE FROM task_dependencies WHERE task_id NOT IN (SELECT task_id FROM tasks) OR depends_on_id NOT IN (SELECT task_id FROM tasks)`);
+    return result.changes;
+  }
+
   stats(): { total: number; pending: number; running: number; completed: number; failed: number } {
     const rows = this.db.prepare('SELECT status, count(*) as count FROM tasks GROUP BY status').all() as any[];
     const counts = { total: 0, pending: 0, running: 0, completed: 0, failed: 0 };
