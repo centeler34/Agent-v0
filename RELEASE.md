@@ -1,3 +1,70 @@
+# Agent v0 — Release v1.3.0
+
+**Release Date:** 2026-04-03
+
+---
+
+## What's New
+
+### Security Audit Trail (Web Dashboard)
+A new Security Audit tab in the Web Dashboard provides a real-time, tamper-evident view of all agent actions. Each entry in the audit trail is cryptographically linked via SHA-256 hashing, ensuring the integrity of the logs. Monitor every decision, action, and outcome of your AI agents — complete with timestamps, agent IDs, and action details.
+
+### Web Dashboard Integration
+The Web Dashboard has been fully rewritten and properly integrated:
+- Dedicated HTTPS server (`src/web/server.ts`) with all security hardening
+- Dark terminal-themed UI with 3-column layout (sidebar, terminal, tasks panel)
+- Real-time Socket.IO connection with auth overlay
+- Agent list rendering for all 10 default agents
+- Task submission and active/completed task tracking
+- Terminal log with 500-line buffer limit
+- XSS-safe output via `escapeHtml` utility
+
+### Advanced Memory System
+- Persistent memory system for agent state and context
+- Shell command validation layer
+- Code syntax bridging between agent components
+
+### Security Hardening
+- Secure task cleanup with safe disposal of completed task data
+- Real-time web heartbeat monitoring for connection health
+- Rate limiting, CORS whitelisting, and Socket.IO auth middleware on all servers
+- Payload validation on all Socket.IO events
+
+### Remote Installation
+New curl one-liner installer for quick setup:
+```bash
+curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-v0/main/scripts/remote-install.sh | bash
+```
+
+---
+
+## Full Changelog (v1.3.0)
+
+- Added Security Audit tab with SHA-256 cryptographic audit trail
+- Rewrote Web Dashboard with proper static file serving (HTML/CSS/JS)
+- Created dedicated HTTPS dashboard server with TLS
+- Implemented advanced memory system for agent persistence
+- Added shell command validation layer
+- Added code syntax bridging between components
+- Implemented secure task cleanup
+- Added real-time web heartbeat monitoring
+- Added remote install script (`scripts/remote-install.sh`)
+- Fixed Web Dashboard server paths and static file references
+- Removed duplicate `index.html` files from orchestrator and CLI commands
+
+---
+
+## Upgrade Notes (v1.3.0)
+
+- The web dashboard now runs on its own HTTPS server — access it at `https://localhost:3000`
+- Auth is required to access the dashboard (rate-limited: 5 attempts/min)
+- Install via curl: `curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-v0/main/scripts/remote-install.sh | bash`
+- All 22 security patches from v1.2.2 remain in place
+
+---
+
+---
+
 # Agent v0 — Release v1.2.2
 
 **Release Date:** 2026-04-02
