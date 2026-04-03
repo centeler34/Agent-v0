@@ -2,16 +2,17 @@
  * Agent v0 — Web Dashboard Server
  *
  * Serves the web dashboard and proxies Socket.IO events to the daemon.
- * Launched by `agent-v0 web start`.
+ * Launched by `agent-v0 web start`. Hardened for v1.2.2.
  */
 
 import express from 'express';
-import { createServer } from 'node:https';
+import type { Request, Response } from 'express';
+import { createServer as createHttpsServer } from 'node:https';
 import { Server } from 'socket.io';
 import path from 'node:path';
 import net from 'node:net';
 import fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import { TaskRegistry } from '../orchestrator/task_registry.js';
@@ -21,6 +22,7 @@ const app = express();
 app.disable('x-powered-by');
 app.disable('etag');
 app.set('trust proxy', false);
+app.use(express.json({ limit: '10kb' })); // Mitigate DOS via large payloads
 
 // ── TLS Setup ─────────────────────────────────────────────────────────────
 
@@ -31,10 +33,17 @@ const certPath = path.join(certDir, 'server.crt');
 if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
   console.log('  TLS certificates not found. Generating self-signed cert...');
   fs.mkdirSync(certDir, { recursive: true });
-  execSync(
-    `openssl req -x509 -newkey rsa:2048 -nodes -out "${certPath}" -keyout "${keyPath}" -days 365 -subj "/CN=localhost"`,
-    { stdio: 'pipe' },
-  );
+  execFileSync('openssl', [
+    'req',
+    '-x509',
+    '-newkey',
+    'rsa:2048',
+    '-nodes',
+    '-out', certPath,
+    '-keyout', keyPath,
+    '-days', '365',
+    '-subj', '/CN=localhost'
+  ], { stdio: 'pipe' });
   console.log('  Self-signed certificate generated.');
 }
 
@@ -43,7 +52,7 @@ const tlsOptions = {
   cert: fs.readFileSync(certPath),
 };
 
-const httpsServer = createServer(tlsOptions, app);
+const httpsServer = createHttpsServer(tlsOptions, app);
 
 // ── Server Configuration ──────────────────────────────────────────────────
 
@@ -51,7 +60,7 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const SOCKET_PATH = '/tmp/agent-v0.sock';
 const ALLOWED_ORIGINS = [`https://localhost:${PORT}`, `https://127.0.0.1:${PORT}`];
 
-const io = new Server(httpsServer, {
+const io = new Server(httpsServer as any, {
   cors: { origin: ALLOWED_ORIGINS, credentials: true },
 });
 
@@ -59,7 +68,6 @@ const io = new Server(httpsServer, {
 const scriptDir = path.dirname(new URL(import.meta.url).pathname);
 const publicDir = path.resolve(scriptDir, 'public');
 app.use(express.static(publicDir));
-app.use(express.json({ limit: '1mb' }));
 
 let registry: TaskRegistry | null = null;
 
@@ -84,7 +92,7 @@ const authenticatedSockets = new Set<string>();
 
 // ── Socket.IO Handlers ────────────────────────────────────────────────────
 
-io.on('connection', (socket) => {
+io.on('connection', (socket: import('socket.io').Socket) => {
   console.log(`  Client connected: ${socket.id}`);
 
   socket.on('disconnect', () => {
@@ -94,7 +102,7 @@ io.on('connection', (socket) => {
   });
 
   // Authentication
-  socket.on('auth', async (data: unknown) => {
+  socket.on('auth', async (data: any) => {
     if (isAuthRateLimited(socket.id)) {
       socket.emit('auth_error', { message: 'Too many auth attempts. Try again later.' });
       return;
@@ -122,17 +130,77 @@ io.on('connection', (socket) => {
       registry.setMasterKey(masterKey);
       authenticatedSockets.add(socket.id);
 
-      socket.emit('auth_success', {
-        stats: registry.stats(),
-        agents: [],
+      // Fetch live agent status from daemon to populate UI
+      const client = net.createConnection(SOCKET_PATH);
+      const statusMsg = JSON.stringify({
+        id: randomUUID(),
+        type: 'daemon_status',
+        payload: {},
       });
+
+      client.on('connect', () => {
+        const lenBuf = Buffer.alloc(4);
+        lenBuf.writeUInt32BE(statusMsg.length, 0);
+        client.write(Buffer.concat([lenBuf, Buffer.from(statusMsg)]));
+      });
+
+      client.on('data', (data) => {
+        try {
+          const response = JSON.parse(data.subarray(4).toString());
+          socket.emit('auth_success', {
+            stats: registry!.stats(),
+            agents: response.payload.agents || [],
+          });
+        } catch {
+          socket.emit('auth_success', { stats: registry!.stats(), agents: [] });
+        } finally {
+          client.end();
+        }
+      });
+      
     } catch {
       socket.emit('auth_error', { message: 'Invalid Master Password' });
     }
   });
 
+  // Heartbeat — Fetch live status for authenticated clients
+  socket.on('get_status', () => {
+    if (!authenticatedSockets.has(socket.id) || !registry) return;
+
+    const client = net.createConnection(SOCKET_PATH);
+    const statusMsg = JSON.stringify({
+      id: randomUUID(),
+      type: 'daemon_status',
+      payload: {},
+    });
+
+    client.on('connect', () => {
+      const lenBuf = Buffer.alloc(4);
+      lenBuf.writeUInt32BE(statusMsg.length, 0);
+      client.write(Buffer.concat([lenBuf, Buffer.from(statusMsg)]));
+    });
+
+    client.on('data', (data) => {
+      try {
+        const response = JSON.parse(data.subarray(4).toString());
+        socket.emit('status_update', {
+          stats: registry!.stats(),
+          agents: response.payload.agents || [],
+        });
+      } catch {
+        // Silent fail on malformed daemon response during heartbeat
+      } finally {
+        client.end();
+      }
+    });
+
+    client.on('error', () => {
+      client.destroy();
+    });
+  });
+
   // Task Submission — proxy to daemon via Unix socket
-  socket.on('submit_task', (taskData: unknown) => {
+  socket.on('submit_task', (taskData: any) => {
     if (!authenticatedSockets.has(socket.id) || !registry) {
       socket.emit('auth_error', { message: 'Authentication required before submitting tasks.' });
       return;
