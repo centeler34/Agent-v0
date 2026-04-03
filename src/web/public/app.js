@@ -68,6 +68,8 @@ function showTab(tabId) {
 
     if (tabId === 'memory-tab') {
         socket.emit('get_memories'); // Refresh memories when tab is opened
+    } else if (tabId === 'audit-tab') {
+        socket.emit('get_audit_logs');
     }
 }
 
@@ -79,6 +81,43 @@ function searchMemories() {
 socket.on('memories_search_results', (memories) => {
     renderMemories(memories);
 });
+
+socket.on('audit_logs', (logs) => {
+    renderAuditLogs(logs);
+});
+
+socket.on('audit_update', (entry) => {
+    const list = document.getElementById('audit-list');
+    // Prepend new real-time logs to the top
+    const div = createAuditElement(entry);
+    if (list.firstChild && list.firstChild.tagName === 'DIV') {
+        list.insertBefore(div, list.firstChild);
+    } else {
+        list.innerHTML = '';
+        list.appendChild(div);
+    }
+});
+
+function renderAuditLogs(logs) {
+    const list = document.getElementById('audit-list');
+    list.innerHTML = '';
+    logs.forEach(log => list.appendChild(createAuditElement(log)));
+}
+
+function createAuditElement(log) {
+    const div = document.createElement('div');
+    div.className = 'memory-item card audit-item';
+    const outcomeClass = log.outcome === 'success' ? 'badge-success' : 'badge-error';
+    div.innerHTML = `
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="badge">${log.agent_id}</span>
+            <span class="badge ${outcomeClass}">${log.action_type.toUpperCase()} : ${log.outcome.toUpperCase()}</span>
+        </div>
+        <div class="small">${new Date(log.timestamp).toLocaleString()} — ${JSON.stringify(log.action_detail)}</div>
+        <div class="audit-hash">CHAIN: ${log.entry_hash.substring(0, 32)}...</div>
+    `;
+    return div;
+}
 
 function openMemoryCreator() {
     document.getElementById('memory-modal').style.display = 'flex';

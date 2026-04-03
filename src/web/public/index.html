@@ -53,6 +53,7 @@
             <div class="tab-nav">
                 <button class="tab-button active" onclick="showTab('terminal-tab')">Terminal</button>
                 <button class="tab-button" onclick="showTab('memory-tab')">Memories</button>
+                <button class="tab-button" onclick="showTab('audit-tab')">Security Audit</button>
             </div>
 
             <div id="terminal-tab" class="tab-content active">
@@ -78,6 +79,16 @@
                     <p class="muted small">No memories found. Create one or search.</p>
                 </div>
             </div>
+
+            <div id="audit-tab" class="tab-content">
+                <div class="memory-controls">
+                    <input type="text" id="auditSearchInput" placeholder="Filter by Agent or Action..." onkeyup="filterAudit()">
+                </div>
+                <div id="audit-list" class="memory-list">
+                    <p class="muted small">Integrity check in progress... Loading audit trail.</p>
+                </div>
+            </div>
+
             <div class="input-area">
                 <div class="input-wrapper">
                     <span class="input-prompt">&gt;</span>

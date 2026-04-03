@@ -262,6 +262,37 @@ input {
     color: #a78bfa;
 }
 
+.badge-success { background: #10b98133; color: var(--success); }
+.badge-error { background: #ef444433; color: var(--error); }
+
+.audit-item {
+    border-left: 2px solid var(--border);
+    padding-left: 15px;
+    position: relative;
+}
+
+.audit-item::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 20px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+}
+
+.audit-hash {
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    word-break: break-all;
+    background: rgba(0,0,0,0.2);
+    padding: 4px;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+
 .btn-icon {
     background: none;
     border: none;

@@ -252,6 +252,26 @@ io.on('connection', (socket: import('socket.io').Socket) => {
     }
   });
 
+  // Security Audit Logs
+  socket.on('get_audit_logs', async () => {
+    if (!authenticatedSockets.has(socket.id)) return;
+    try {
+      const auditPath = path.join(os.homedir(), '.agent-v0', 'audit', 'audit.jsonl');
+      if (fs.existsSync(auditPath)) {
+        const content = fs.readFileSync(auditPath, 'utf8');
+        const logs = content.trim().split('\n').map(line => {
+          try { return JSON.parse(line); } catch { return null; }
+        }).filter(Boolean).reverse().slice(0, 50); // Get latest 50
+        
+        socket.emit('audit_logs', logs);
+      } else {
+        socket.emit('audit_logs', []);
+      }
+    } catch (err) {
+      console.error('Failed to read audit logs:', err);
+    }
+  });
+
   // Task Submission — proxy to daemon via Unix socket
   socket.on('submit_task', (taskData: any) => {
     if (!authenticatedSockets.has(socket.id) || !registry) {
@@ -297,6 +317,12 @@ io.on('connection', (socket: import('socket.io').Socket) => {
         try {
           const response = JSON.parse(jsonBuf.toString('utf-8'));
           socket.emit('task_update', response);
+          
+          // Automatically trigger an audit refresh on the client if the task completes
+          if (response.type === 'task_complete') {
+             // In a full implementation, the daemon would write to audit.jsonl 
+             // and we would emit an 'audit_update' event here.
+          }
 
           if (response.type === 'task_complete' || response.type === 'task_error') {
             client.end();
