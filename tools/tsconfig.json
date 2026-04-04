@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "outDir": "../dist/tools",
+    "rootDir": ".",
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": true,
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "compat/**/*",
+    "agent-v0-bridge.ts",
+    "tools.ts",
+    "tasks.ts",
+    "commands.ts",
+    "Task.ts",
+    "Tool.ts",
+    "context.ts",
+    "query.ts",
+    "QueryEngine.ts",
+    "setup.ts",
+    "main.tsx",
+    "cost-tracker.ts",
+    "costHook.ts",
+    "history.ts",
+    "ink.ts",
+    "projectOnboardingState.ts"
+  ],
+  "exclude": ["node_modules"]
+}

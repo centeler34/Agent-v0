@@ -134,33 +134,44 @@ io.on('connection', (socket: import('socket.io').Socket) => {
       authenticatedSockets.add(socket.id);
 
       // Fetch live agent status from daemon to populate UI
-      const client = net.createConnection(SOCKET_PATH);
-      const statusMsg = JSON.stringify({
-        id: randomUUID(),
-        type: 'daemon_status',
-        payload: {},
-      });
+      // Try to get live status from daemon; fall back gracefully if daemon is not running
+      try {
+        const client = net.createConnection(SOCKET_PATH);
+        const statusMsg = JSON.stringify({
+          id: randomUUID(),
+          type: 'daemon_status',
+          payload: {},
+        });
 
-      client.on('connect', () => {
-        const lenBuf = Buffer.alloc(4);
-        lenBuf.writeUInt32BE(statusMsg.length, 0);
-        client.write(Buffer.concat([lenBuf, Buffer.from(statusMsg)]));
-      });
+        client.on('connect', () => {
+          const lenBuf = Buffer.alloc(4);
+          lenBuf.writeUInt32BE(statusMsg.length, 0);
+          client.write(Buffer.concat([lenBuf, Buffer.from(statusMsg)]));
+        });
 
-      client.on('data', (data) => {
-        try {
-          const response = JSON.parse(data.subarray(4).toString());
-          socket.emit('auth_success', {
-            stats: registry!.stats(),
-            agents: response.payload.agents || [],
-          });
-        } catch {
+        client.on('data', (data) => {
+          try {
+            const response = JSON.parse(data.subarray(4).toString());
+            socket.emit('auth_success', {
+              stats: registry!.stats(),
+              agents: response.payload.agents || [],
+            });
+          } catch {
+            socket.emit('auth_success', { stats: registry!.stats(), agents: [] });
+          } finally {
+            client.end();
+          }
+        });
+
+        client.on('error', () => {
+          // Daemon not running — still authenticate, show stats without live agents
           socket.emit('auth_success', { stats: registry!.stats(), agents: [] });
-        } finally {
-          client.end();
-        }
-      });
-      
+          client.destroy();
+        });
+      } catch {
+        socket.emit('auth_success', { stats: registry!.stats(), agents: [] });
+      }
+
     } catch {
       socket.emit('auth_error', { message: 'Invalid Master Password' });
     }

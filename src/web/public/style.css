@@ -662,7 +662,140 @@ body {
 
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
+/* ── Toast Notifications ──────────────────────────────────────────────────── */
+
+.toast-container {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    color: var(--text-1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    animation: toast-in 0.3s ease-out;
+    max-width: 360px;
+}
+
+.toast.removing { animation: toast-out 0.25s ease-in forwards; }
+
+.toast-icon { font-size: 1rem; flex-shrink: 0; }
+.toast.toast-success { border-left: 3px solid var(--success); }
+.toast.toast-success .toast-icon { color: var(--success); }
+.toast.toast-error { border-left: 3px solid var(--error); }
+.toast.toast-error .toast-icon { color: var(--error); }
+.toast.toast-info { border-left: 3px solid var(--info); }
+.toast.toast-info .toast-icon { color: var(--info); }
+.toast.toast-warning { border-left: 3px solid var(--warning); }
+.toast.toast-warning .toast-icon { color: var(--warning); }
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateX(40px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+@keyframes toast-out {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(40px); }
+}
+
+/* ── Keyboard Shortcut Overlay ────────────────────────────────────────────── */
+
+.shortcut-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2500;
+}
+
+.shortcut-overlay.visible { display: flex; }
+
+.shortcut-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    width: 380px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.shortcut-grid { display: flex; flex-direction: column; gap: 8px; }
+
+.shortcut-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+}
+
+.shortcut-row span { color: var(--text-2); font-size: 0.8rem; }
+
+kbd {
+    display: inline-block;
+    padding: 3px 8px;
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    min-width: 28px;
+    text-align: center;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+
+.term-line {
+    padding: 1px 0;
+    animation: line-in 0.15s ease-out;
+}
+
+@keyframes line-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.agent-item { transition: background 0.15s, transform 0.1s; }
+.agent-item:active { transform: scale(0.98); }
+
+.task-card { transition: border-color 0.2s, box-shadow 0.2s; }
+.task-card:hover { border-color: var(--accent-dim); box-shadow: 0 2px 12px rgba(0, 229, 255, 0.05); }
+
+.memory-card { transition: border-color 0.2s, transform 0.15s; }
+.memory-card:hover { border-color: var(--accent-dim); transform: translateY(-1px); }
+
+.audit-entry { transition: background 0.15s; }
+.audit-entry:hover { background: var(--bg-2); }
+
+/* Cursor blink in terminal */
+.terminal::after {
+    content: '\25CF';
+    color: var(--accent);
+    animation: blink 1.2s step-end infinite;
+    font-size: 0.6rem;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
 /* Scrollbar global */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }

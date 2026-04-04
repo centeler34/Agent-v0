@@ -17,6 +17,57 @@ let startTime = Date.now();
 let terminalLines = 0;
 const MAX_TERMINAL_LINES = 500;
 
+// ── Command History ────────────────────────────────────────────────────────
+
+const cmdHistory = [];
+let historyIndex = -1;
+const MAX_HISTORY = 100;
+
+function pushHistory(cmd) {
+    if (!cmd || (cmdHistory.length > 0 && cmdHistory[cmdHistory.length - 1] === cmd)) return;
+    cmdHistory.push(cmd);
+    if (cmdHistory.length > MAX_HISTORY) cmdHistory.shift();
+    historyIndex = cmdHistory.length;
+}
+
+function historyUp() {
+    if (cmdHistory.length === 0) return;
+    if (historyIndex > 0) historyIndex--;
+    cmdInput.value = cmdHistory[historyIndex] || '';
+}
+
+function historyDown() {
+    if (historyIndex < cmdHistory.length - 1) {
+        historyIndex++;
+        cmdInput.value = cmdHistory[historyIndex];
+    } else {
+        historyIndex = cmdHistory.length;
+        cmdInput.value = '';
+    }
+}
+
+// ── Toast Notifications ────────────────────────────────────────────────────
+
+const TOAST_ICONS = {
+    success: '\u2713',
+    error: '\u2717',
+    info: '\u2139',
+    warning: '\u26A0',
+};
+
+function toast(message, type = 'info', duration = 3500) {
+    const container = document.getElementById('toast-container');
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.innerHTML = `<span class="toast-icon">${TOAST_ICONS[type] || ''}</span><span>${escapeHtml(message)}</span>`;
+    container.appendChild(el);
+
+    setTimeout(() => {
+        el.classList.add('removing');
+        setTimeout(() => el.remove(), 250);
+    }, duration);
+}
+
 // ── Utilities ──────────────────────────────────────────────────────────────
 
 function escapeHtml(str) {
@@ -52,6 +103,8 @@ socket.on('auth_success', (data) => {
     sendBtn.disabled = false;
     cmdInput.focus();
     termLog('Fleet unlocked. Command center ready.', 'success');
+    termLog('Press Ctrl+K for keyboard shortcuts.', 'sys');
+    toast('Authentication successful', 'success');
     updateStats(data.stats);
     updateAgentList(data.agents);
     startHeartbeat();
@@ -63,6 +116,7 @@ socket.on('auth_error', (data) => {
     authError.style.display = 'block';
     document.getElementById('passInput').value = '';
     document.getElementById('passInput').focus();
+    toast(data.message, 'error');
 });
 
 // ── Heartbeat ──────────────────────────────────────────────────────────────
@@ -92,28 +146,105 @@ socket.on('status_update', (data) => {
 socket.on('connect', () => {
     connStatus.className = 'conn-badge connected';
     connText.textContent = 'Connected';
-    if (authenticated) termLog('Reconnected to daemon.', 'success');
+    if (authenticated) {
+        termLog('Reconnected to daemon.', 'success');
+        toast('Daemon reconnected', 'success');
+    }
 });
 
 socket.on('disconnect', () => {
     connStatus.className = 'conn-badge disconnected';
     connText.textContent = 'Disconnected';
-    if (authenticated) termLog('Connection lost. Attempting reconnect...', 'err');
+    if (authenticated) {
+        termLog('Connection lost. Attempting reconnect...', 'err');
+        toast('Connection lost', 'error');
+    }
 });
 
 // ── Tab Navigation ─────────────────────────────────────────────────────────
+
+const TAB_IDS = ['terminal-tab', 'tasks-tab', 'memory-tab', 'audit-tab'];
 
 function showTab(tabId, btn) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
 
     document.getElementById(tabId).classList.add('active');
-    if (btn) btn.classList.add('active');
+    if (btn) {
+        btn.classList.add('active');
+    } else {
+        const tabs = document.querySelectorAll('.tab');
+        const idx = TAB_IDS.indexOf(tabId);
+        if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
+    }
 
     if (tabId === 'terminal-tab') cmdInput.focus();
     if (tabId === 'memory-tab') socket.emit('get_memories');
     if (tabId === 'audit-tab') socket.emit('get_audit_logs');
 }
+
+// ── Keyboard Shortcuts ─────────────────────────────────────────────────────
+
+function toggleShortcutHelp() {
+    const overlay = document.getElementById('shortcut-help');
+    overlay.classList.toggle('visible');
+}
+
+document.addEventListener('keydown', (e) => {
+    const inputFocused = document.activeElement === cmdInput ||
+                         document.activeElement?.tagName === 'INPUT' ||
+                         document.activeElement?.tagName === 'TEXTAREA';
+
+    // Ctrl+K — shortcut help
+    if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        toggleShortcutHelp();
+        return;
+    }
+
+    // Ctrl+L — clear terminal
+    if (e.ctrlKey && e.key === 'l') {
+        e.preventDefault();
+        output.innerHTML = '';
+        terminalLines = 0;
+        termLog('Terminal cleared.', 'sys');
+        return;
+    }
+
+    // Escape — close modals / blur input
+    if (e.key === 'Escape') {
+        const shortcutOverlay = document.getElementById('shortcut-help');
+        const memoryModal = document.getElementById('memory-modal');
+        if (shortcutOverlay.classList.contains('visible')) {
+            shortcutOverlay.classList.remove('visible');
+        } else if (memoryModal.style.display === 'flex') {
+            closeMemoryModal();
+        } else if (inputFocused) {
+            document.activeElement.blur();
+        }
+        return;
+    }
+
+    // / — focus command input (when not already in an input)
+    if (e.key === '/' && !inputFocused && authenticated) {
+        e.preventDefault();
+        cmdInput.focus();
+        return;
+    }
+
+    // Number keys 1-4 — switch tabs (when not in input)
+    if (!inputFocused && authenticated && e.key >= '1' && e.key <= '4') {
+        const idx = parseInt(e.key) - 1;
+        if (TAB_IDS[idx]) showTab(TAB_IDS[idx]);
+        return;
+    }
+
+    // Arrow Up/Down in command input — history
+    if (inputFocused && document.activeElement === cmdInput) {
+        if (e.key === 'ArrowUp') { e.preventDefault(); historyUp(); }
+        if (e.key === 'ArrowDown') { e.preventDefault(); historyDown(); }
+    }
+});
 
 // ── Terminal ───────────────────────────────────────────────────────────────
 
@@ -147,13 +278,17 @@ function sendCmd() {
     const val = cmdInput.value.trim();
     if (!val) return;
 
+    pushHistory(val);
     termLog(val, 'cmd');
     socket.emit('submit_task', { task_type: 'intent', raw_input: val });
     cmdInput.value = '';
 }
 
 function sendQuick(cmd) {
-    if (!authenticated) return;
+    if (!authenticated) {
+        toast('Authenticate first', 'warning');
+        return;
+    }
     cmdInput.value = cmd;
     sendCmd();
 }
@@ -164,20 +299,24 @@ socket.on('task_update', (data) => {
     if (data.type === 'task_accepted') {
         termLog(`Task ${data.payload.task_id} accepted`, 'agent');
         addTaskCard(data.payload.task_id, data.payload.description || 'Processing...', 'running');
+        toast('Task accepted', 'info');
     } else if (data.type === 'task_output') {
         termLog(`[${data.payload.agent_id}] ${data.payload.text}`, 'out');
         updateRecentOutput(data.payload.agent_id, data.payload.text);
     } else if (data.type === 'task_complete') {
         termLog('Task complete.', 'success');
         updateTaskStatus(data.payload?.task_id, 'done');
+        toast('Task completed', 'success');
     } else if (data.type === 'task_error') {
         termLog(`Error: ${data.payload.error}`, 'err');
         updateTaskStatus(data.payload?.task_id, 'failed');
+        toast('Task failed', 'error');
     }
 });
 
 socket.on('task_error', (data) => {
     termLog(`IPC Error: ${data.message}`, 'err');
+    toast(data.message, 'error');
 });
 
 // ── Agent List ─────────────────────────────────────────────────────────────
@@ -228,8 +367,9 @@ function updateStats(stats) {
     if (!stats) return;
     const pillTasks = document.getElementById('pill-tasks-text');
     const pillTaskDot = document.querySelector('#pill-tasks .pill-dot');
-    pillTasks.textContent = `${stats.active || 0} active`;
-    pillTaskDot.className = `pill-dot ${(stats.active || 0) > 0 ? 'dot-busy' : 'dot-active'}`;
+    const active = stats.running || stats.active || 0;
+    pillTasks.textContent = `${active} active`;
+    pillTaskDot.className = `pill-dot ${active > 0 ? 'dot-busy' : 'dot-active'}`;
 
     if (stats.cost !== undefined) {
         document.getElementById('pill-cost-text').textContent = `$${stats.cost.toFixed(4)}`;
@@ -280,7 +420,6 @@ function updateRecentOutput(agentId, text) {
     `;
     container.prepend(entry);
 
-    // Keep max 20 entries
     while (container.children.length > 20) {
         container.removeChild(container.lastChild);
     }
@@ -289,7 +428,9 @@ function updateRecentOutput(agentId, text) {
 // ── Memory ─────────────────────────────────────────────────────────────────
 
 function openMemoryCreator() {
+    if (!authenticated) { toast('Authenticate first', 'warning'); return; }
     document.getElementById('memory-modal').style.display = 'flex';
+    document.getElementById('memFact').focus();
 }
 
 function closeMemoryModal() {
@@ -304,7 +445,7 @@ function submitMemory() {
     const howToApply = document.getElementById('memHow').value.trim();
 
     if (!fact) {
-        termLog('Memory fact/rule is required.', 'err');
+        toast('Fact/rule is required', 'warning');
         return;
     }
 
@@ -313,7 +454,7 @@ function submitMemory() {
 
 socket.on('memory_saved', () => {
     closeMemoryModal();
-    termLog('Memory saved.', 'success');
+    toast('Memory saved', 'success');
     socket.emit('get_memories');
 });
 
@@ -325,17 +466,23 @@ function renderMemories(memories) {
     list.innerHTML = '';
 
     if (!memories || memories.length === 0) {
-        list.innerHTML = '<div class="empty-state">No memories stored.</div>';
+        list.innerHTML = '<div class="empty-state">No memories stored. Create one to persist agent context.</div>';
         return;
     }
 
     memories.forEach(m => {
         const card = document.createElement('div');
         card.className = 'memory-card';
+
+        const content = m.content || m.fact || '';
+        const why = m.why || '';
+        const how = m.howToApply || m.how_to_apply || '';
+
         card.innerHTML = `
             <span class="memory-type type-${escapeHtml(m.type)}">${escapeHtml(m.type)}</span>
-            <div class="memory-fact">${escapeHtml(m.content || m.fact || '')}</div>
-            <div class="memory-detail">${escapeHtml(m.why || '')}</div>
+            <div class="memory-fact">${escapeHtml(content)}</div>
+            ${why ? `<div class="memory-detail"><strong>Why:</strong> ${escapeHtml(why)}</div>` : ''}
+            ${how ? `<div class="memory-detail"><strong>Apply:</strong> ${escapeHtml(how)}</div>` : ''}
         `;
         list.appendChild(card);
     });
@@ -353,7 +500,7 @@ function clearAllMemories() {
 }
 
 socket.on('memories_cleared', () => {
-    termLog('All memories cleared.', 'err');
+    toast('All memories cleared', 'warning');
     socket.emit('get_memories');
 });
 
@@ -368,7 +515,7 @@ function renderAuditLogs(logs) {
     list.innerHTML = '';
 
     if (!logs || logs.length === 0) {
-        list.innerHTML = '<div class="empty-state">No audit entries.</div>';
+        list.innerHTML = '<div class="empty-state">No audit entries yet.</div>';
         countEl.textContent = '0 entries';
         return;
     }
