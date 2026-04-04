@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../compat/bun-bundle-shim.js'
 import memoize from 'lodash-es/memoize.js'
 import {
   checkStatsigFeatureGate_CACHED_MAY_BE_STALE,

@@ -13,7 +13,7 @@
  * (SDK -p mode via query.enableRemoteControl).
  */
 
-import { feature } from 'bun:bundle'
+import { feature } from '../compat/bun-bundle-shim.js'
 import { hostname } from 'os'
 import { getOriginalCwd, getSessionId } from '../bootstrap/state.js'
 import type { SDKMessage } from '../entrypoints/agentSdkTypes.js'

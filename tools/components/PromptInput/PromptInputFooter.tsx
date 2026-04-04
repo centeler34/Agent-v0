@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle';
+import { feature } from '../../compat/bun-bundle-shim.js';
 import * as React from 'react';
 import { memo, type ReactNode, useMemo, useRef } from 'react';
 import { isBridgeEnabled } from '../../bridge/bridgeEnabled.js';

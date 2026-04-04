@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle';
+import { feature } from '../../compat/bun-bundle-shim.js';
 import { spawnSync } from 'child_process';
 import sample from 'lodash-es/sample.js';
 import * as React from 'react';

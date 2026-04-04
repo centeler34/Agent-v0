@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../compat/bun-bundle-shim.js'
 import type { Command } from '../commands.js'
 import { maybeMarkProjectOnboardingComplete } from '../projectOnboardingState.js'
 import { isEnvTruthy } from '../utils/envUtils.js'

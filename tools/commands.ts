@@ -1,4 +1,10 @@
-// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
+/**
+ * Agent v0 — Command Registry
+ *
+ * Central registry of all slash commands and skills available in the
+ * Agent v0 CLI. Commands include built-in operations, skill-based
+ * workflows, plugins, and security-focused utilities.
+ */
 import addDir from './commands/add-dir/index.js'
 import autofixPr from './commands/autofix-pr/index.js'
 import backfillSessions from './commands/backfill-sessions/index.js'
@@ -44,19 +50,14 @@ import skills from './commands/skills/index.js'
 import status from './commands/status/index.js'
 import tasks from './commands/tasks/index.js'
 import teleport from './commands/teleport/index.js'
-/* eslint-disable @typescript-eslint/no-require-imports */
-const agentsPlatform =
-  process.env.USER_TYPE === 'ant'
-    ? require('./commands/agents-platform/index.js').default
-    : null
-/* eslint-enable @typescript-eslint/no-require-imports */
+const agentsPlatform = null
 import securityReview from './commands/security-review.js'
 import bughunter from './commands/bughunter/index.js'
 import terminalSetup from './commands/terminalSetup/index.js'
 import usage from './commands/usage/index.js'
 import theme from './commands/theme/index.js'
 import vim from './commands/vim/index.js'
-import { feature } from 'bun:bundle'
+import { feature } from './compat/bun-bundle-shim.js'
 // Dead code elimination: conditional imports
 /* eslint-disable @typescript-eslint/no-require-imports */
 const proactive =
@@ -340,9 +341,7 @@ const COMMANDS = memoize((): Command[] => [
   tasks,
   ...(workflowsCmd ? [workflowsCmd] : []),
   ...(torch ? [torch] : []),
-  ...(process.env.USER_TYPE === 'ant' && !process.env.IS_DEMO
-    ? INTERNAL_ONLY_COMMANDS
-    : []),
+  ...INTERNAL_ONLY_COMMANDS,
 ])
 
 export const builtInCommandNames = memoize(

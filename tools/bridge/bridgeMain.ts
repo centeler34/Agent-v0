@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../compat/bun-bundle-shim.js'
 import { randomUUID } from 'crypto'
 import { hostname, tmpdir } from 'os'
 import { basename, join, resolve } from 'path'

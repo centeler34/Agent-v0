@@ -287,15 +287,15 @@ See [config/config.example.yaml](config/config.example.yaml) for full configurat
 ### Start the Daemon
 
 ```bash
-agent-cyplex daemon start       # Start background daemon
-agent-cyplex daemon status      # Check daemon health
-agent-cyplex daemon stop        # Graceful shutdown
+agent-v0 daemon start       # Start background daemon
+agent-v0 daemon status      # Check daemon health
+agent-v0 daemon stop        # Graceful shutdown
 ```
 
 ### Interactive REPL
 
 ```bash
-agent-cyplex                    # Launch interactive mode
+agent-v0                    # Launch interactive mode
 ```
 
 Inside the REPL, slash commands are available:
@@ -304,7 +304,7 @@ Inside the REPL, slash commands are available:
 |---------|--------|
 | `/update` | Fetch latest updates from GitHub, rebuild all components, and restart |
 | `/setup` | Re-run the setup wizard to reconfigure API keys and settings |
-| `/uninstall` | Remove Agent Cyplex completely (config, data, binaries) |
+| `/uninstall` | Remove Agent v0 completely (config, data, binaries) |
 | `/status` | Query daemon status |
 | `/help` | Show available commands |
 | `exit` | Quit the REPL |
@@ -314,7 +314,7 @@ Inside the REPL, slash commands are available:
 Pull the latest patches, rebuild, and restart in one command:
 
 ```bash
-agent-cyplex update             # From the command line
+agent-v0 update             # From the command line
 ```
 
 Or type `/update` inside the interactive REPL. The updater will:
@@ -326,24 +326,24 @@ Or type `/update` inside the interactive REPL. The updater will:
 ### Task Management
 
 ```bash
-agent-cyplex task submit "Enumerate subdomains for example.com"
-agent-cyplex task status <task-id>
-agent-cyplex task cancel <task-id>
+agent-v0 task submit "Enumerate subdomains for example.com"
+agent-v0 task status <task-id>
+agent-v0 task cancel <task-id>
 ```
 
 ### Agent Management
 
 ```bash
-agent-cyplex agent list         # List all agents and their status
-agent-cyplex agent status recon # Check specific agent
+agent-v0 agent list         # List all agents and their status
+agent-v0 agent status recon # Check specific agent
 ```
 
 ### Skill Management
 
 ```bash
-agent-cyplex skill list         # List available skills
-agent-cyplex skill load ./custom-skill.yaml
-agent-cyplex skill verify ./skill.yaml
+agent-v0 skill list         # List available skills
+agent-v0 skill load ./custom-skill.yaml
+agent-v0 skill verify ./skill.yaml
 ```
 
 ### Model Management
@@ -352,28 +352,28 @@ agent-cyplex skill verify ./skill.yaml
 ### Audit Logs
 
 ```bash
-agent-cyplex audit query --agent recon --last 1h
+agent-v0 audit query --agent recon --last 1h
 ```
 
 ### Key Management
 
 ```bash
-agent-cyplex keys set ANTHROPIC_API_KEY
-agent-cyplex keys list
+agent-v0 keys set ANTHROPIC_API_KEY
+agent-v0 keys list
 ```
 
 ### Bot Management
 
 ```bash
-agent-cyplex bot enable telegram
-agent-cyplex bot disable discord
+agent-v0 bot enable telegram
+agent-v0 bot disable discord
 ```
 
 ### Session Management
 
 ```bash
-agent-cyplex session list
-agent-cyplex session archive <session-id>
+agent-v0 session list
+agent-v0 session archive <session-id>
 ```
 
 ---
@@ -432,7 +432,7 @@ All incoming messages are normalized to a unified format, routed through the Age
 ## Project Structure
 
 ```
-Agent-cyplex/
+Agent-v0/
 +-- src/                    TypeScript core
 |   +-- orchestrator/       Task decomposition & orchestration
 |   +-- gateway/            Multi-provider AI routing

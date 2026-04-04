@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../compat/bun-bundle-shim.js'
 import { getShortcutDisplay } from '../keybindings/shortcutFormat.js'
 import { isExtractModeActive } from '../memdir/paths.js'
 import {

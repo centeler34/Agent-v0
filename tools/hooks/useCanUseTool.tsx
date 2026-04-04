@@ -1,5 +1,5 @@
 import { c as _c } from "react/compiler-runtime";
-import { feature } from 'bun:bundle';
+import { feature } from '../compat/bun-bundle-shim.js';
 import { APIUserAbortError } from '@anthropic-ai/sdk';
 import * as React from 'react';
 import { useCallback } from 'react';

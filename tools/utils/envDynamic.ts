@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../compat/bun-bundle-shim.js'
 import { stat } from 'fs/promises'
 import memoize from 'lodash-es/memoize.js'
 import { env, JETBRAINS_IDES } from './env.js'

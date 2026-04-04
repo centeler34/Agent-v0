@@ -1,4 +1,11 @@
-import { feature } from 'bun:bundle'
+/**
+ * Agent v0 — Task Registry
+ *
+ * Defines all task types available to Agent v0 agents.
+ * Tasks represent execution modes: local shell, local agent,
+ * remote agent, workflow, and monitoring.
+ */
+import { feature } from './compat/bun-bundle-shim.js'
 import type { Task, TaskType } from './Task.js'
 import { DreamTask } from './tasks/DreamTask/DreamTask.js'
 import { LocalAgentTask } from './tasks/LocalAgentTask/LocalAgentTask.js'
@@ -15,9 +22,8 @@ const MonitorMcpTask: Task | null = feature('MONITOR_TOOL')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
- * Get all tasks.
- * Mirrors the pattern from tools.ts
- * Note: Returns array inline to avoid circular dependency issues with top-level const
+ * Get all task types available to Agent v0 agents.
+ * Returns array inline to avoid circular dependency issues.
  */
 export function getAllTasks(): Task[] {
   const tasks: Task[] = [

@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../compat/bun-bundle-shim.js'
 import type { Message } from '../types/message.js'
 import type { Attachment } from '../utils/attachments.js'
 import { getGlobalConfig } from '../utils/config.js'

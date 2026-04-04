@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../../compat/bun-bundle-shim.js'
 
 export const MEMORY_TYPE_VALUES = [
   'User',

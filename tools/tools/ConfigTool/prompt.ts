@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../../compat/bun-bundle-shim.js'
 import { getModelOptions } from '../../utils/model/modelOptions.js'
 import { isVoiceGrowthBookEnabled } from '../../voice/voiceModeEnabled.js'
 import {

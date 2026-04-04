@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../../compat/bun-bundle-shim.js'
 import { relative } from 'path'
 import {
   getOriginalCwd,

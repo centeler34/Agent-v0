@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../../compat/bun-bundle-shim.js'
 import type Anthropic from '@anthropic-ai/sdk'
 import {
   APIConnectionError,

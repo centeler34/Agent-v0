@@ -1,15 +1,43 @@
+/**
+ * Agent v0 — Command Center Client
+ */
+
 const socket = io();
 const output = document.getElementById('output');
 const cmdInput = document.getElementById('cmdInput');
+const sendBtn = document.getElementById('sendBtn');
 const authOverlay = document.getElementById('auth');
 const authError = document.getElementById('auth-error');
 const connStatus = document.getElementById('connection-status');
 const connText = document.getElementById('conn-text');
-const cmdInputTerminal = document.getElementById('terminal-tab').querySelector('#cmdInput');
 
+let authenticated = false;
 let heartbeatTimer = null;
+let startTime = Date.now();
+let terminalLines = 0;
+const MAX_TERMINAL_LINES = 500;
 
-// ── Auth Handling ───────────────────────────────────────────────────────────
+// ── Utilities ──────────────────────────────────────────────────────────────
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function formatTime(date) {
+    return new Date(date).toLocaleTimeString('en-US', { hour12: false });
+}
+
+function formatUptime() {
+    const ms = Date.now() - startTime;
+    const s = Math.floor(ms / 1000) % 60;
+    const m = Math.floor(ms / 60000) % 60;
+    const h = Math.floor(ms / 3600000);
+    return `${h}h ${m}m ${s}s`;
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────────
 
 function login() {
     const password = document.getElementById('passInput').value;
@@ -18,20 +46,26 @@ function login() {
 }
 
 socket.on('auth_success', (data) => {
+    authenticated = true;
     authOverlay.style.display = 'none';
     cmdInput.disabled = false;
+    sendBtn.disabled = false;
     cmdInput.focus();
-    log('Fleet unlocked. System ready.', '#10b981');
-    showTab('terminal-tab'); // Show terminal by default after auth
+    termLog('Fleet unlocked. Command center ready.', 'success');
     updateStats(data.stats);
     updateAgentList(data.agents);
     startHeartbeat();
+    startUptimeCounter();
 });
 
 socket.on('auth_error', (data) => {
     authError.textContent = data.message;
     authError.style.display = 'block';
+    document.getElementById('passInput').value = '';
+    document.getElementById('passInput').focus();
 });
+
+// ── Heartbeat ──────────────────────────────────────────────────────────────
 
 function startHeartbeat() {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
@@ -40,84 +74,219 @@ function startHeartbeat() {
     }, 5000);
 }
 
+function startUptimeCounter() {
+    startTime = Date.now();
+    setInterval(() => {
+        const el = document.getElementById('sys-uptime');
+        if (el) el.textContent = formatUptime();
+    }, 1000);
+}
+
 socket.on('status_update', (data) => {
     updateStats(data.stats);
     updateAgentList(data.agents);
 });
 
-socket.on('memories_list', (memories) => {
-    renderMemories(memories);
+// ── Connection ─────────────────────────────────────────────────────────────
+
+socket.on('connect', () => {
+    connStatus.className = 'conn-badge connected';
+    connText.textContent = 'Connected';
+    if (authenticated) termLog('Reconnected to daemon.', 'success');
 });
 
-// ── Tab Navigation ──────────────────────────────────────────────────────────
+socket.on('disconnect', () => {
+    connStatus.className = 'conn-badge disconnected';
+    connText.textContent = 'Disconnected';
+    if (authenticated) termLog('Connection lost. Attempting reconnect...', 'err');
+});
 
-function showTab(tabId) {
-    document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
-    document.getElementById(tabId).style.display = 'block';
+// ── Tab Navigation ─────────────────────────────────────────────────────────
 
-    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-    document.querySelector(`.tab-button[onclick="showTab('${tabId}')"]`).classList.add('active');
+function showTab(tabId, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
 
-    // Focus command input based on tab
-    if (tabId === 'terminal-tab') {
-        cmdInputTerminal.disabled = false;
-        cmdInputTerminal.focus();
-    } else {
-        cmdInputTerminal.disabled = true;
-    }
+    document.getElementById(tabId).classList.add('active');
+    if (btn) btn.classList.add('active');
 
-    if (tabId === 'memory-tab') {
-        socket.emit('get_memories'); // Refresh memories when tab is opened
-    } else if (tabId === 'audit-tab') {
-        socket.emit('get_audit_logs');
-    }
+    if (tabId === 'terminal-tab') cmdInput.focus();
+    if (tabId === 'memory-tab') socket.emit('get_memories');
+    if (tabId === 'audit-tab') socket.emit('get_audit_logs');
 }
 
-function searchMemories() {
-    const query = document.getElementById('memorySearchInput').value.trim();
-    socket.emit('search_memories', { query });
-}
+// ── Terminal ───────────────────────────────────────────────────────────────
 
-socket.on('memories_search_results', (memories) => {
-    renderMemories(memories);
-});
-
-socket.on('audit_logs', (logs) => {
-    renderAuditLogs(logs);
-});
-
-socket.on('audit_update', (entry) => {
-    const list = document.getElementById('audit-list');
-    // Prepend new real-time logs to the top
-    const div = createAuditElement(entry);
-    if (list.firstChild && list.firstChild.tagName === 'DIV') {
-        list.insertBefore(div, list.firstChild);
-    } else {
-        list.innerHTML = '';
-        list.appendChild(div);
-    }
-});
-
-function renderAuditLogs(logs) {
-    const list = document.getElementById('audit-list');
-    list.innerHTML = '';
-    logs.forEach(log => list.appendChild(createAuditElement(log)));
-}
-
-function createAuditElement(log) {
+function termLog(msg, cls = 'out') {
     const div = document.createElement('div');
-    div.className = 'memory-item card audit-item';
-    const outcomeClass = log.outcome === 'success' ? 'badge-success' : 'badge-error';
-    div.innerHTML = `
-        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-            <span class="badge">${log.agent_id}</span>
-            <span class="badge ${outcomeClass}">${log.action_type.toUpperCase()} : ${log.outcome.toUpperCase()}</span>
-        </div>
-        <div class="small">${new Date(log.timestamp).toLocaleString()} — ${JSON.stringify(log.action_detail)}</div>
-        <div class="audit-hash">CHAIN: ${log.entry_hash.substring(0, 32)}...</div>
-    `;
-    return div;
+    div.className = `term-line ${cls}`;
+
+    const time = document.createElement('span');
+    time.style.cssText = 'color: var(--text-3); margin-right: 10px; font-size: 0.7rem;';
+    time.textContent = formatTime(new Date());
+
+    const content = document.createElement('span');
+    content.textContent = msg;
+
+    div.appendChild(time);
+    div.appendChild(content);
+    output.appendChild(div);
+
+    terminalLines++;
+    if (terminalLines > MAX_TERMINAL_LINES) {
+        output.removeChild(output.firstChild);
+        terminalLines--;
+    }
+
+    output.scrollTo({ top: output.scrollHeight, behavior: 'smooth' });
 }
+
+// ── Commands ───────────────────────────────────────────────────────────────
+
+function sendCmd() {
+    const val = cmdInput.value.trim();
+    if (!val) return;
+
+    termLog(val, 'cmd');
+    socket.emit('submit_task', { task_type: 'intent', raw_input: val });
+    cmdInput.value = '';
+}
+
+function sendQuick(cmd) {
+    if (!authenticated) return;
+    cmdInput.value = cmd;
+    sendCmd();
+}
+
+// ── Task Updates ───────────────────────────────────────────────────────────
+
+socket.on('task_update', (data) => {
+    if (data.type === 'task_accepted') {
+        termLog(`Task ${data.payload.task_id} accepted`, 'agent');
+        addTaskCard(data.payload.task_id, data.payload.description || 'Processing...', 'running');
+    } else if (data.type === 'task_output') {
+        termLog(`[${data.payload.agent_id}] ${data.payload.text}`, 'out');
+        updateRecentOutput(data.payload.agent_id, data.payload.text);
+    } else if (data.type === 'task_complete') {
+        termLog('Task complete.', 'success');
+        updateTaskStatus(data.payload?.task_id, 'done');
+    } else if (data.type === 'task_error') {
+        termLog(`Error: ${data.payload.error}`, 'err');
+        updateTaskStatus(data.payload?.task_id, 'failed');
+    }
+});
+
+socket.on('task_error', (data) => {
+    termLog(`IPC Error: ${data.message}`, 'err');
+});
+
+// ── Agent List ─────────────────────────────────────────────────────────────
+
+const DEFAULT_AGENTS = [
+    { id: 'agentic', role: 'Orchestrator', state: 'idle' },
+    { id: 'recon', role: 'Reconnaissance', state: 'idle' },
+    { id: 'code', role: 'Code Analysis', state: 'idle' },
+    { id: 'exploit-research', role: 'CVE Research', state: 'idle' },
+    { id: 'forensics', role: 'Forensics', state: 'idle' },
+    { id: 'osint', role: 'Intelligence', state: 'idle' },
+    { id: 'threat-intel', role: 'Threat Intel', state: 'idle' },
+    { id: 'report', role: 'Reports', state: 'idle' },
+    { id: 'monitor', role: 'Monitoring', state: 'idle' },
+    { id: 'scribe', role: 'Documentation', state: 'idle' },
+];
+
+function updateAgentList(agents) {
+    const list = document.getElementById('agent-list');
+    const pillText = document.getElementById('pill-agents-text');
+    const pillDot = document.querySelector('#pill-agents .pill-dot');
+
+    const agentData = agents && agents.length > 0 ? agents : DEFAULT_AGENTS;
+    list.innerHTML = '';
+    pillText.textContent = `${agentData.length} agents`;
+
+    const anyBusy = agentData.some(a => a.state === 'busy');
+    pillDot.className = `pill-dot ${anyBusy ? 'dot-busy' : 'dot-active'}`;
+
+    agentData.forEach(agent => {
+        const div = document.createElement('div');
+        div.className = 'agent-item';
+
+        const dotClass = agent.state === 'busy' ? 'busy' : agent.state === 'idle' ? 'idle' : 'active';
+
+        div.innerHTML = `
+            <span class="agent-dot ${dotClass}"></span>
+            <span class="agent-name">${escapeHtml(agent.id)}</span>
+            <span class="agent-role">${escapeHtml(agent.role || agent.state)}</span>
+        `;
+        list.appendChild(div);
+    });
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+
+function updateStats(stats) {
+    if (!stats) return;
+    const pillTasks = document.getElementById('pill-tasks-text');
+    const pillTaskDot = document.querySelector('#pill-tasks .pill-dot');
+    pillTasks.textContent = `${stats.active || 0} active`;
+    pillTaskDot.className = `pill-dot ${(stats.active || 0) > 0 ? 'dot-busy' : 'dot-active'}`;
+
+    if (stats.cost !== undefined) {
+        document.getElementById('pill-cost-text').textContent = `$${stats.cost.toFixed(4)}`;
+    }
+}
+
+// ── Task Cards (Right Panel) ───────────────────────────────────────────────
+
+function addTaskCard(taskId, description, status) {
+    const queue = document.getElementById('task-queue');
+    const placeholder = queue.querySelector('.placeholder-text');
+    if (placeholder) placeholder.remove();
+
+    const card = document.createElement('div');
+    card.className = 'task-card';
+    card.id = `task-${taskId}`;
+    card.innerHTML = `
+        <div class="task-card-header">
+            <span class="task-card-id">${escapeHtml(taskId.substring(0, 8))}</span>
+            <span class="task-card-status ${status}">${status}</span>
+        </div>
+        <div class="task-card-body">${escapeHtml(description)}</div>
+    `;
+    queue.prepend(card);
+}
+
+function updateTaskStatus(taskId, status) {
+    if (!taskId) return;
+    const card = document.getElementById(`task-${taskId}`);
+    if (card) {
+        const statusEl = card.querySelector('.task-card-status');
+        statusEl.className = `task-card-status ${status}`;
+        statusEl.textContent = status;
+    }
+}
+
+function updateRecentOutput(agentId, text) {
+    const container = document.getElementById('recent-output');
+    const placeholder = container.querySelector('.placeholder-text');
+    if (placeholder) placeholder.remove();
+
+    const entry = document.createElement('div');
+    entry.style.cssText = 'font-size: 0.75rem; padding: 6px 0; border-bottom: 1px solid var(--border);';
+    entry.innerHTML = `
+        <span style="color: var(--accent); font-weight: 500;">${escapeHtml(agentId)}</span>
+        <span style="color: var(--text-3); margin: 0 4px;">|</span>
+        <span style="color: var(--text-2);">${escapeHtml(text.substring(0, 100))}</span>
+    `;
+    container.prepend(entry);
+
+    // Keep max 20 entries
+    while (container.children.length > 20) {
+        container.removeChild(container.lastChild);
+    }
+}
+
+// ── Memory ─────────────────────────────────────────────────────────────────
 
 function openMemoryCreator() {
     document.getElementById('memory-modal').style.display = 'flex';
@@ -134,8 +303,8 @@ function submitMemory() {
     const why = document.getElementById('memWhy').value.trim();
     const howToApply = document.getElementById('memHow').value.trim();
 
-    if (!fact || !why || !howToApply) {
-        alert('Please fill in all required fields.');
+    if (!fact) {
+        termLog('Memory fact/rule is required.', 'err');
         return;
     }
 
@@ -144,140 +313,104 @@ function submitMemory() {
 
 socket.on('memory_saved', () => {
     closeMemoryModal();
-    log('System memory updated.', '#10b981');
+    termLog('Memory saved.', 'success');
+    socket.emit('get_memories');
 });
 
+socket.on('memories_list', (memories) => renderMemories(memories));
+socket.on('memories_search_results', (memories) => renderMemories(memories));
+
+function renderMemories(memories) {
+    const list = document.getElementById('memory-list');
+    list.innerHTML = '';
+
+    if (!memories || memories.length === 0) {
+        list.innerHTML = '<div class="empty-state">No memories stored.</div>';
+        return;
+    }
+
+    memories.forEach(m => {
+        const card = document.createElement('div');
+        card.className = 'memory-card';
+        card.innerHTML = `
+            <span class="memory-type type-${escapeHtml(m.type)}">${escapeHtml(m.type)}</span>
+            <div class="memory-fact">${escapeHtml(m.content || m.fact || '')}</div>
+            <div class="memory-detail">${escapeHtml(m.why || '')}</div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function searchMemories() {
+    const query = document.getElementById('memorySearchInput').value.trim();
+    socket.emit('search_memories', { query });
+}
+
 function clearAllMemories() {
-    if (confirm('Are you sure you want to clear ALL memories? This action cannot be undone.')) {
+    if (confirm('Clear ALL memories? This cannot be undone.')) {
         socket.emit('clear_all_memories');
     }
 }
 
 socket.on('memories_cleared', () => {
-    log('All system memories cleared.', '#ef4444');
-    socket.emit('get_memories'); // Refresh the list to show it's empty
+    termLog('All memories cleared.', 'err');
+    socket.emit('get_memories');
 });
 
-// ── Task Orchestration ──────────────────────────────────────────────────────
+// ── Audit Trail ────────────────────────────────────────────────────────────
 
-function sendCmd() {
-    const val = cmdInput.value.trim();
-    if (!val) return;
-    
-    log(`> ${val}`, '#00f2ff');
-    socket.emit('submit_task', { task_type: 'intent', raw_input: val });
-    cmdInputTerminal.value = '';
-}
+socket.on('audit_logs', (logs) => renderAuditLogs(logs));
+socket.on('audit_update', (entry) => prependAuditEntry(entry));
 
-function sendQuick(cmd) {
-    cmdInput.value = cmd;
-    sendCmd();
-}
-
-socket.on('task_update', (data) => {
-    if (data.type === 'task_accepted') {
-        log(`Task ${data.payload.task_id} accepted.`, '#71717a');
-    } else if (data.type === 'task_output') {
-        log(`[${data.payload.agent_id}] ${data.payload.text}`);
-    } else if (data.type === 'task_complete') {
-        log(`Task complete.`, '#10b981');
-    } else if (data.type === 'task_error') {
-        log(`Error: ${data.payload.error}`, '#ef4444');
-    }
-});
-
-socket.on('task_error', (data) => {
-    log(`IPC Error: ${data.message}`, '#ef4444');
-});
-
-function updateAgentList(agents) {
-    const list = document.getElementById('agent-list');
-    const countEl = document.getElementById('stat-agents');
+function renderAuditLogs(logs) {
+    const list = document.getElementById('audit-list');
+    const countEl = document.getElementById('audit-count');
     list.innerHTML = '';
-    
-    if (!agents || agents.length === 0) {
-        list.innerHTML = '<p class="muted small">No agents registered</p>';
-        countEl.textContent = '0 agents';
+
+    if (!logs || logs.length === 0) {
+        list.innerHTML = '<div class="empty-state">No audit entries.</div>';
+        countEl.textContent = '0 entries';
         return;
     }
 
-    countEl.textContent = `${agents.length} agents`;
-    agents.forEach(agent => {
-        const div = document.createElement('div');
-        div.className = 'agent-item';
-        div.style.marginBottom = '8px';
-        
-        const statusClass = agent.state === 'idle' ? 'online' : agent.state === 'busy' ? 'busy' : 'offline'; // Assuming 'online' for idle, 'busy' for busy, 'offline' for others
-        
-        const dot = `<span class="status-dot ${statusClass}"></span> `;
-        div.innerHTML = dot; // The dot is safe
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = `${agent.id} (${agent.state})`;
-        div.appendChild(nameSpan);
-
-        list.appendChild(div);
-    });
+    countEl.textContent = `${logs.length} entries`;
+    logs.forEach(log => list.appendChild(createAuditEntry(log)));
 }
 
-function renderMemories(memories) {
-    const list = document.getElementById('memory-list');
-    list.innerHTML = '';
-    if (memories.length === 0) {
-        list.innerHTML = '<p class="muted small">No memories found matching your search.</p>';
-        return;
-    }
-    memories.forEach(m => {
-        const div = document.createElement('div');
-        div.className = 'memory-item card';
-        div.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div>
-                    <span class="badge badge-${m.type}">${m.type.toUpperCase()}</span>
-                    <p style="margin: 8px 0; font-size: 13px; white-space: pre-wrap;">${m.content}</p>
-                    <small class="muted">${new Date(m.created_at).toLocaleString()}</small>
-                </div>
-                <button onclick="deleteMemory('${m.memory_id}')" class="btn-icon">×</button>
-            </div>
-        `;
-        list.appendChild(div);
-    });
+function prependAuditEntry(entry) {
+    const list = document.getElementById('audit-list');
+    const empty = list.querySelector('.empty-state');
+    if (empty) empty.remove();
+    list.prepend(createAuditEntry(entry));
+
+    const countEl = document.getElementById('audit-count');
+    const current = parseInt(countEl.textContent) || 0;
+    countEl.textContent = `${current + 1} entries`;
 }
 
-// ── UI Helpers ──────────────────────────────────────────────────────────────
-
-
-function log(msg, color = '#e1e1e6') {
+function createAuditEntry(log) {
     const div = document.createElement('div');
-    div.style.color = color;
-    div.style.marginBottom = '4px';
-    
-    const time = document.createElement('span');
-    time.className = 'muted small';
-    time.style.marginRight = '8px';
-    time.textContent = new Date().toLocaleTimeString();
-    
-    const content = document.createElement('span');
-    content.textContent = msg;
-    
-    div.appendChild(time);
-    div.appendChild(content);
-    output.appendChild(div);
-    output.scrollTo({ top: output.scrollHeight, behavior: 'smooth' });
+    div.className = 'audit-entry';
+
+    const outcomeColor = log.outcome === 'success' ? 'var(--success)' : 'var(--error)';
+
+    div.innerHTML = `
+        <div class="audit-time">${formatTime(log.timestamp)}</div>
+        <div class="audit-content">
+            <div class="audit-action" style="color: ${outcomeColor}">
+                ${escapeHtml(log.action_type || 'unknown')} &mdash; ${escapeHtml(log.outcome || 'unknown')}
+            </div>
+            <div class="audit-agent">${escapeHtml(log.agent_id || 'system')}</div>
+            <div class="audit-hash">${escapeHtml((log.entry_hash || '').substring(0, 48))}...</div>
+        </div>
+    `;
+    return div;
 }
 
-function updateStats(stats) {
-    const statsEl = document.getElementById('stats');
-    if (!stats) return;
-    statsEl.style.display = 'flex';
-    document.getElementById('stat-tasks').textContent = `${stats.total} total tasks`;
+function filterAudit() {
+    const query = document.getElementById('auditSearchInput').value.trim().toLowerCase();
+    document.querySelectorAll('.audit-entry').forEach(entry => {
+        const text = entry.textContent.toLowerCase();
+        entry.style.display = text.includes(query) ? 'flex' : 'none';
+    });
 }
-
-socket.on('connect', () => {
-    connStatus.className = 'status-connected';
-    connText.textContent = 'DAEMON CONNECTED';
-});
-
-socket.on('disconnect', () => {
-    connStatus.className = 'status-disconnected';
-    connText.textContent = 'DISCONNECTED';
-});

@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../../compat/bun-bundle-shim.js'
 import { writeFile } from 'fs/promises'
 import { z } from 'zod/v4'
 import {

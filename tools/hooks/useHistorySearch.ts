@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../compat/bun-bundle-shim.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   getModeFromInput,

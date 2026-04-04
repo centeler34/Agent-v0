@@ -2,7 +2,7 @@
  * Conversation clearing utility.
  * This module has heavier dependencies and should be lazy-loaded when possible.
  */
-import { feature } from 'bun:bundle'
+import { feature } from '../../compat/bun-bundle-shim.js'
 import { randomUUID, type UUID } from 'crypto'
 import {
   getLastMainRequestId,

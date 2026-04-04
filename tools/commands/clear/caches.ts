@@ -2,7 +2,7 @@
  * Session cache clearing utilities.
  * This module is imported at startup by main.tsx, so keep imports minimal.
  */
-import { feature } from 'bun:bundle'
+import { feature } from '../../compat/bun-bundle-shim.js'
 import {
   clearInvokedSkills,
   setLastEmittedDate,

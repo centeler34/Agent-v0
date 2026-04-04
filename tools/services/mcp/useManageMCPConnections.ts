@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../../compat/bun-bundle-shim.js'
 import { basename } from 'path'
 import { useCallback, useEffect, useRef } from 'react'
 import { getSessionId } from '../../bootstrap/state.js'

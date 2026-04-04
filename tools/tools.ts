@@ -1,4 +1,10 @@
-// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
+/**
+ * Agent v0 — Tool Registry
+ *
+ * Central registry of all tools available to Agent v0 agents.
+ * Tools provide file operations, search, execution, network access,
+ * and agent orchestration capabilities.
+ */
 import { toolMatchesName, type Tool, type Tools } from './Tool.js'
 import { AgentTool } from './tools/AgentTool/AgentTool.js'
 import { SkillTool } from './tools/SkillTool/SkillTool.js'
@@ -11,17 +17,9 @@ import { NotebookEditTool } from './tools/NotebookEditTool/NotebookEditTool.js'
 import { WebFetchTool } from './tools/WebFetchTool/WebFetchTool.js'
 import { TaskStopTool } from './tools/TaskStopTool/TaskStopTool.js'
 import { BriefTool } from './tools/BriefTool/BriefTool.js'
-// Dead code elimination: conditional import for ant-only tools
-/* eslint-disable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
-const REPLTool =
-  process.env.USER_TYPE === 'ant'
-    ? require('./tools/REPLTool/REPLTool.js').REPLTool
-    : null
-const SuggestBackgroundPRTool =
-  process.env.USER_TYPE === 'ant'
-    ? require('./tools/SuggestBackgroundPRTool/SuggestBackgroundPRTool.js')
-        .SuggestBackgroundPRTool
-    : null
+/* eslint-disable @typescript-eslint/no-require-imports */
+const REPLTool = null
+const SuggestBackgroundPRTool = null
 const SleepTool =
   feature('PROACTIVE') || feature('KAIROS')
     ? require('./tools/SleepTool/SleepTool.js').SleepTool
@@ -101,7 +99,7 @@ export {
   ASYNC_AGENT_ALLOWED_TOOLS,
   COORDINATOR_MODE_ALLOWED_TOOLS,
 } from './constants/tools.js'
-import { feature } from 'bun:bundle'
+import { feature } from './compat/bun-bundle-shim.js'
 // Dead code elimination: conditional import for OVERFLOW_TEST_TOOL
 /* eslint-disable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
 const OverflowTestTool = feature('OVERFLOW_TEST_TOOL')
@@ -183,12 +181,8 @@ export function getToolsForDefaultPreset(): string[] {
 }
 
 /**
- * Get the complete exhaustive list of all tools that could be available
- * in the current environment (respecting process.env flags).
- * This is the source of truth for ALL tools.
- */
-/**
- * NOTE: This MUST stay in sync with https://console.statsig.com/4aF3Ewatb6xPVpCwxb5nA3/dynamic_configs/claude_code_global_system_caching, in order to cache the system prompt across users.
+ * Get the complete list of all tools available to Agent v0 agents.
+ * This is the source of truth for ALL tools in the system.
  */
 export function getAllBaseTools(): Tools {
   return [
@@ -211,9 +205,7 @@ export function getAllBaseTools(): Tools {
     AskUserQuestionTool,
     SkillTool,
     EnterPlanModeTool,
-    ...(process.env.USER_TYPE === 'ant' ? [ConfigTool] : []),
-    ...(process.env.USER_TYPE === 'ant' ? [TungstenTool] : []),
-    ...(SuggestBackgroundPRTool ? [SuggestBackgroundPRTool] : []),
+    ConfigTool,
     ...(WebBrowserTool ? [WebBrowserTool] : []),
     ...(isTodoV2Enabled()
       ? [TaskCreateTool, TaskGetTool, TaskUpdateTool, TaskListTool]
@@ -229,7 +221,7 @@ export function getAllBaseTools(): Tools {
       ? [getTeamCreateTool(), getTeamDeleteTool()]
       : []),
     ...(VerifyPlanExecutionTool ? [VerifyPlanExecutionTool] : []),
-    ...(process.env.USER_TYPE === 'ant' && REPLTool ? [REPLTool] : []),
+    ...(REPLTool ? [REPLTool] : []),
     ...(WorkflowTool ? [WorkflowTool] : []),
     ...(SleepTool ? [SleepTool] : []),
     ...cronTools,
@@ -241,7 +233,7 @@ export function getAllBaseTools(): Tools {
     ...(SubscribePRTool ? [SubscribePRTool] : []),
     ...(getPowerShellTool() ? [getPowerShellTool()] : []),
     ...(SnipTool ? [SnipTool] : []),
-    ...(process.env.NODE_ENV === 'test' ? [TestingPermissionTool] : []),
+    ...(process.env.AGENT_V0_TESTING === 'true' ? [TestingPermissionTool] : []),
     ListMcpResourcesTool,
     ReadMcpResourceTool,
     // Include ToolSearchTool when tool search might be enabled (optimistic check)

@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle'
+import { feature } from '../../compat/bun-bundle-shim.js'
 import { microcompactMessages } from '../../services/compact/microCompact.js'
 import type { AppState } from '../../state/AppStateStore.js'
 import type { Tools, ToolUseContext } from '../../Tool.js'
