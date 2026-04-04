@@ -88,6 +88,23 @@ function getLocalVersion(installDir: string): string {
   }
 }
 
+/**
+ * Write the installed version into package.json so future update checks
+ * compare against the actual installed release, not a stale value.
+ */
+function stampVersion(installDir: string, version: string): void {
+  const pkgPath = path.join(installDir, 'package.json');
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    if (pkg.version === version) return; // already correct
+    pkg.version = version;
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+    info(`Version stamped: ${BOLD}v${version}${NC}`);
+  } catch {
+    warn('Could not stamp version into package.json');
+  }
+}
+
 // ── GitHub API helpers ───────────────────────────────────────────────────────
 
 interface GitHubRelease {
@@ -360,6 +377,10 @@ async function updateViaGitHubRelease(installDir: string, release: GitHubRelease
 
     success(`Installed ${BOLD}${tag}${NC}`);
 
+    // Stamp the installed version into package.json so future update
+    // checks know exactly which release is installed locally.
+    stampVersion(installDir, stripV(tag));
+
     // Update the local git reference if this is a git repo
     if (fs.existsSync(path.join(installDir, '.git'))) {
       try {
@@ -428,7 +449,8 @@ function updateViaGitPull(installDir: string): boolean {
     } catch { /* no changes */ }
 
     run('git pull origin main --ff-only', installDir);
-    success('Code updated via git');
+    const pulledVersion = getLocalVersion(installDir);
+    success(`Code updated via git → v${pulledVersion}`);
     return true;
   } catch {
     error('Git pull failed. Resolve conflicts manually.');

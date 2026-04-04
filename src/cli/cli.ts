@@ -25,6 +25,21 @@ import { isFirstRun, runSetupWizard } from './setup_wizard.js';
 import { runUpdate } from './updater.js';
 import { runUninstall } from './uninstaller.js';
 
+// ── Version (read from package.json at startup) ────────────────────────────
+
+function getVersion(): string {
+  try {
+    const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+    const pkgPath = path.resolve(scriptDir, '..', '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+const APP_VERSION = getVersion();
+
 // ── ANSI Color Palette ──────────────────────────────────────────────────────
 
 const c = {
@@ -108,7 +123,7 @@ function printBanner(): void {
   console.log(`  ${c.blue}${c.bold} ╚██████╗   ██║   ██║     ███████╗███████╗██╔╝ ██╗${c.reset}`);
   console.log(`  ${c.brightBlue}${c.bold}  ╚═════╝   ╚═╝   ╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝${c.reset}`);
   console.log('');
-  console.log(`  ${c.bold}${c.white}  Agent v0${c.reset}  ${c.dim}v1.4.0${c.reset}`);
+  console.log(`  ${c.bold}${c.white}  Agent v0${c.reset}  ${c.dim}v${APP_VERSION}${c.reset}`);
   console.log(`  ${c.dim}  Multi-Agent AI Orchestration Terminal${c.reset}`);
   console.log(`  ${c.dim}  Universal Orchestration Edition${c.reset}`);
   console.log('');
@@ -363,7 +378,7 @@ async function main(): Promise<void> {
   program
     .name('agent-v0')
     .description('Agent v0 — Universal multi-agent AI orchestration CLI')
-    .version('1.4.0');
+    .version(APP_VERSION);
 
   program.command('setup')
     .description('Run the setup wizard to configure API keys, providers, and integrations')
