@@ -8,7 +8,7 @@ description = "Shared cryptographic primitives for Agent Cyplex"
 hmac = "0.12"
 sha2 = "0.10"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
-zeroize = { version = "1", features = ["derive"] }
+zeroize = { version = "1.8", features = ["derive"] }
 rand = "0.8"
-thiserror = "1"
-serde = { version = "1", features = ["derive"] }
+thiserror = "2.0"
+serde = { version = "1.0.228", features = ["derive"] }

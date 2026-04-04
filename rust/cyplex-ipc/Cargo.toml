@@ -14,5 +14,5 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
 chrono = { workspace = true }
-bytes = "1"
-subtle = "2"
+bytes = "1.11"
+subtle = "2.6"

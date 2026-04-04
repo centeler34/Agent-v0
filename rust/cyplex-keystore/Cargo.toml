@@ -7,9 +7,9 @@ description = "Encrypted secret storage engine for Agent Cyplex"
 [dependencies]
 aes-gcm = "0.10"
 argon2 = "0.5"
-zeroize = { version = "1", features = ["derive"] }
+zeroize = { version = "1.8", features = ["derive"] }
 rand = "0.8"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "1"
-base64 = "0.22"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
+base64 = "0.22.1"

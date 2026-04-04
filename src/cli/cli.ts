@@ -108,7 +108,7 @@ function printBanner(): void {
   console.log(`  ${c.blue}${c.bold} ╚██████╗   ██║   ██║     ███████╗███████╗██╔╝ ██╗${c.reset}`);
   console.log(`  ${c.brightBlue}${c.bold}  ╚═════╝   ╚═╝   ╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝${c.reset}`);
   console.log('');
-  console.log(`  ${c.bold}${c.white}  Agent v0${c.reset}  ${c.dim}v1.0.0${c.reset}`);
+  console.log(`  ${c.bold}${c.white}  Agent v0${c.reset}  ${c.dim}v1.4.0${c.reset}`);
   console.log(`  ${c.dim}  Multi-Agent AI Orchestration Terminal${c.reset}`);
   console.log(`  ${c.dim}  Universal Orchestration Edition${c.reset}`);
   console.log('');
@@ -363,7 +363,7 @@ async function main(): Promise<void> {
   program
     .name('agent-v0')
     .description('Agent v0 — Universal multi-agent AI orchestration CLI')
-    .version('1.0.0');
+    .version('1.4.0');
 
   program.command('setup')
     .description('Run the setup wizard to configure API keys, providers, and integrations')

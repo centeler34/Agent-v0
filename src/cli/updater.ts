@@ -161,18 +161,34 @@ export async function runUpdate(): Promise<void> {
   info(`Updated to: ${BOLD}${newHash}${NC}`);
   console.log('');
 
-  // ── Step 3: Rebuild components ─────────────────────────────────────────
+  // ── Step 3: Update & rebuild components ─────────────────────────────────
 
-  info('Rebuilding components...');
+  info('Updating dependencies & rebuilding components...');
   console.log('');
 
-  // TypeScript
-  info('  Installing dependencies...');
+  // ── Node.js / TypeScript ──
+  info('  Updating npm dependencies...');
   try {
+    if (hasCommand('npx')) {
+      try {
+        run('npx npm-check-updates -u', installDir);
+        info('  package.json updated to latest versions');
+      } catch {
+        warn('  npm-check-updates not available, using existing versions');
+      }
+    }
     run('npm install', installDir);
-    success('  Dependencies installed');
+    success('  Node dependencies installed');
   } catch {
     error('  npm install failed. Check logs for details.');
+  }
+
+  // Run npm audit fix to patch known vulnerabilities
+  try {
+    run('npm audit fix', installDir);
+    success('  npm audit vulnerabilities patched');
+  } catch {
+    warn('  npm audit fix had issues (non-critical)');
   }
 
   info('  Compiling TypeScript...');
@@ -183,8 +199,16 @@ export async function runUpdate(): Promise<void> {
     error('  TypeScript build failed. Check logs for details.');
   }
 
-  // Rust (if cargo is available)
+  // ── Rust ──
   if (hasCommand('cargo')) {
+    info('  Updating Rust dependencies...');
+    try {
+      run('cargo update', installDir);
+      success('  Cargo.lock updated to latest compatible versions');
+    } catch {
+      warn('  cargo update failed, using existing lock file');
+    }
+
     info('  Building Rust crates...');
     try {
       run('cargo build --release', installDir);
@@ -194,8 +218,17 @@ export async function runUpdate(): Promise<void> {
     }
   }
 
-  // Go (if go is available)
+  // ── Go ──
   if (hasCommand('go')) {
+    info('  Updating Go modules...');
+    try {
+      run('go get -u ./...', path.join(installDir, 'go', 'net-probe'));
+      run('go mod tidy', path.join(installDir, 'go', 'net-probe'));
+      success('  Go modules updated');
+    } catch {
+      warn('  Go module update skipped');
+    }
+
     info('  Building Go utilities...');
     try {
       const goDistDir = path.join(installDir, 'dist', 'go');
@@ -207,12 +240,12 @@ export async function runUpdate(): Promise<void> {
     }
   }
 
-  // Python deps
+  // ── Python ──
   if (hasCommand('pip')) {
     info('  Updating Python dependencies...');
     try {
-      run('pip install -r python/forensics-service/requirements.txt -q', installDir);
-      run('pip install -r python/osint-utils/requirements.txt -q', installDir);
+      run('pip install --upgrade -r python/forensics-service/requirements.txt -q', installDir);
+      run('pip install --upgrade -r python/osint-utils/requirements.txt -q', installDir);
       success('  Python dependencies updated');
     } catch {
       warn('  Python deps update skipped');
