@@ -60,6 +60,10 @@ pub fn decode_message(buf: &[u8]) -> Result<IpcMessage, IpcError> {
         .map_err(|e| IpcError::MessageDecodingError(e.to_string()))
 }
 
+/// Maximum allowed IPC message size (16 MiB). Prevents a malicious or
+/// buggy peer from causing a multi-gigabyte allocation.
+const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
+
 /// Read a single length-prefixed message from an async reader.
 pub async fn read_message<R: AsyncRead + Unpin>(reader: &mut R) -> Result<IpcMessage, IpcError> {
     let mut len_buf = [0u8; 4];
@@ -75,6 +79,11 @@ pub async fn read_message<R: AsyncRead + Unpin>(reader: &mut R) -> Result<IpcMes
     if len == 0 {
         return Err(IpcError::MessageDecodingError(
             "zero-length message".to_string(),
+        ));
+    }
+    if len > MAX_MESSAGE_SIZE {
+        return Err(IpcError::MessageDecodingError(
+            format!("message too large: {} bytes (max {})", len, MAX_MESSAGE_SIZE),
         ));
     }
 

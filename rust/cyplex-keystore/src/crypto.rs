@@ -77,10 +77,18 @@ pub fn derive_key_argon2id(password: &[u8], salt: &[u8]) -> Result<[u8; 32], Key
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::rngs::OsRng;
+    use rand::Rng;
+
+    fn generate_test_key() -> [u8; 32] {
+        let mut key = [0u8; 32];
+        OsRng.fill(&mut key);
+        key
+    }
 
     #[test]
     fn roundtrip_encrypt_decrypt() {
-        let key = [0xABu8; 32];
+        let key = generate_test_key();
         let plaintext = b"hello, cyplex keystore";
         let encrypted = encrypt_aes256gcm(plaintext, &key).unwrap();
         let decrypted = decrypt_aes256gcm(&encrypted, &key).unwrap();
@@ -98,8 +106,8 @@ mod tests {
 
     #[test]
     fn wrong_key_fails() {
-        let key = [0xABu8; 32];
-        let wrong_key = [0xCDu8; 32];
+        let key = generate_test_key();
+        let wrong_key = generate_test_key();
         let encrypted = encrypt_aes256gcm(b"secret", &key).unwrap();
         assert!(decrypt_aes256gcm(&encrypted, &wrong_key).is_err());
     }

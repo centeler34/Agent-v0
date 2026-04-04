@@ -1,5 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
+use subtle::ConstantTimeEq;
 
 /// A session token used to authenticate CLI connections to the daemon.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,7 +34,9 @@ impl SessionToken {
     /// Validate a raw token string against a stored `SessionToken`.
     ///
     /// Returns `true` if the strings match and the token has not expired.
+    /// Uses constant-time comparison to prevent timing attacks.
     pub fn validate(token_str: &str, stored: &SessionToken) -> bool {
-        stored.token == token_str && stored.is_valid()
+        let token_match = stored.token.as_bytes().ct_eq(token_str.as_bytes()).into();
+        token_match && stored.is_valid()
     }
 }
