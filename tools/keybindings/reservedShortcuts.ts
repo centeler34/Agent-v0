@@ -11,7 +11,7 @@ export type ReservedShortcut = {
 }
 
 /**
- * Shortcuts that cannot be rebound - they are hardcoded in Claude Code.
+ * Shortcuts that cannot be rebound - they are hardcoded in Agent v0.
  */
 export const NON_REBINDABLE: ReservedShortcut[] = [
   {

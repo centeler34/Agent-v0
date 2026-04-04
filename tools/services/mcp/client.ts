@@ -984,10 +984,10 @@ export const connectToServer = memoize(
 
       const client = new Client(
         {
-          name: 'claude-code',
-          title: 'Claude Code',
+          name: 'agent-v0',
+          title: 'Agent v0',
           version: MACRO.VERSION ?? 'unknown',
-          description: "Anthropic's agentic coding tool",
+          description: 'Multi-agent AI orchestration terminal',
           websiteUrl: PRODUCT_URL,
         },
         {
@@ -3279,10 +3279,10 @@ export async function setupSdkMcpClients(
 
       const client = new Client(
         {
-          name: 'claude-code',
-          title: 'Claude Code',
+          name: 'agent-v0',
+          title: 'Agent v0',
           version: MACRO.VERSION ?? 'unknown',
-          description: "Anthropic's agentic coding tool",
+          description: 'Multi-agent AI orchestration terminal',
           websiteUrl: PRODUCT_URL,
         },
         {

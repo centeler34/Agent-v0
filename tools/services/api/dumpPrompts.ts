@@ -46,7 +46,8 @@ export function clearAllDumpState(): void {
 }
 
 export function addApiRequestToCache(requestData: unknown): void {
-  if (process.env.USER_TYPE !== 'ant') return
+  // Agent v0: cache API requests for ALL users, not just internal.
+  // Transparency: anyone can inspect real API calls via /tools-inspect.
   cachedApiRequests.push({
     timestamp: new Date().toISOString(),
     request: requestData,

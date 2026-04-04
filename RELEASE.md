@@ -1,3 +1,58 @@
+# Agent v0 — Release v1.3.1
+
+**Release Date:** 2026-04-04
+
+---
+
+## What's New
+
+### Deep Tool Integration
+Agents can now execute real tools during task processing. Instead of relying solely on AI model responses, every agent has access to a curated set of tools (Bash, Grep, Glob, FileRead, FileWrite, FileEdit, WebFetch) via the `AgentToolkit` system. Tool calls are sandboxed, audited, and iteratively fed back to the model.
+
+- **Tool Execution Runtime** (`src/tools/tool_runtime.ts`) — 7 tool implementations with path traversal protection, per-agent allowlists, and audit logging
+- **Agent Toolkit** (`src/tools/agent_toolkit.ts`) — Permission-enforcing wrapper that bundles all tools for each agent
+- **BaseAgent** upgraded with `queryModelWithTools()` — iterative tool-use loop that parses model tool calls, executes them, and feeds results back (up to 10 rounds)
+- All 9 agent subclasses updated to use tool-augmented execution
+
+### Web UI Polish
+- Keyboard shortcuts (`/` focus, `Ctrl+L` clear, `Ctrl+K` help, `1-4` tab switch)
+- Toast notification system (success/error/info/warning with auto-dismiss)
+- Command history (100 entries, Up/Down arrow navigation)
+- Terminal line fade-in animations and card hover effects
+- Graceful fallback when daemon socket is not running
+
+### Full Rebranding
+- Replaced all ~400 "Claude Code" display strings across 196 files in the tools/ framework
+- Updated internal identifiers (MCP client name, analytics service, temp directories)
+- External URLs, API wire protocol values, and package references left intact
+
+---
+
+## Full Changelog (v1.3.1)
+
+- Added `src/tools/tool_runtime.ts` with Bash, Grep, Glob, FileRead, FileWrite, FileEdit, WebFetch implementations
+- Added `src/tools/agent_toolkit.ts` with per-agent permission enforcement
+- Updated `BaseAgent` with toolkit integration and `queryModelWithTools()` loop
+- Updated all 9 agents (recon, code, forensics, exploit_research, monitor, threat_intel, osint_analyst, report, scribe) to use tools during execution
+- Replaced ~400 "Claude Code" references with "Agent v0" across tools/ framework
+- Updated internal identifiers (MCP client, analytics, temp dirs)
+- Added tool-use documentation to README.md with security model explanation
+- Web UI: keyboard shortcuts, toast notifications, command history, animations
+- Fixed daemon socket connection graceful fallback in web server
+- Removed unused `globSync` import from tool_runtime.ts
+
+---
+
+## Upgrade Notes (v1.3.1)
+
+- Agents now attempt real tool execution during tasks — ensure tools like `rg` (ripgrep), `find`, and `nmap` are installed for full capability
+- The tool audit log is in-memory (capped at 10,000 entries) — not persisted to disk
+- Tool execution is workspace-sandboxed: agents cannot access files outside their assigned directory
+
+---
+
+---
+
 # Agent v0 — Release v1.3.0
 
 **Release Date:** 2026-04-03

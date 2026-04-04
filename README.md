@@ -22,6 +22,7 @@ Agent v0 is a powerful framework for deploying fleets of specialized AI agents. 
 - [Agent Roles](#agent-roles)
 - [Skill System](#skill-system)
 - [Bot Integrations](#bot-integrations)
+- [Tool Integration](#tool-integration)
 - [Project Structure](#project-structure)
 - [License](#license)
 
@@ -382,16 +383,50 @@ agent-v0 session archive <session-id>
 
 | Agent | Role | Capabilities |
 |-------|------|-------------|
-| **Agentic** | Orchestrator | Task decomposition, delegation, result synthesis |
-| **Recon** | Reconnaissance | Subdomain enumeration, DNS sweeps, port scanning, fingerprinting |
-| **Code** | Code Analysis | Vulnerability review, dependency audit, decompilation analysis |
-| **Exploit Research** | CVE Research | CVE chain building, ATT&CK mapping, patch diff analysis |
-| **Forensics** | Digital Forensics | PCAP analysis, malware static analysis, memory forensics, log timelines |
-| **OSINT Analyst** | Intelligence | Breach lookups, certificate transparency, entity graph building |
-| **Threat Intel** | Threat Intelligence | Actor profiling, IoC ingestion, STIX export |
-| **Report** | Documentation | Pentest reports, executive summaries, finding writeups |
-| **Monitor** | Monitoring | Continuous asset monitoring and alerting |
-| **Scribe** | Documentation | Session documentation and note-taking |
+| **Agentic** | Orchestrator | Task decomposition, delegation, result synthesis | All tools |
+| **Recon** | Reconnaissance | Subdomain enumeration, DNS sweeps, port scanning, fingerprinting | Bash, Grep, Glob, FileRead, FileWrite, WebFetch |
+| **Code** | Code Analysis | Vulnerability review, dependency audit, decompilation analysis | Bash, Grep, Glob, FileRead, FileWrite, FileEdit |
+| **Exploit Research** | CVE Research | CVE chain building, ATT&CK mapping, patch diff analysis | Bash, Grep, Glob, FileRead, FileWrite, WebFetch |
+| **Forensics** | Digital Forensics | PCAP analysis, malware static analysis, memory forensics, log timelines | Bash, Grep, Glob, FileRead, FileWrite |
+| **OSINT Analyst** | Intelligence | Breach lookups, certificate transparency, entity graph building | Bash, Grep, Glob, FileRead, FileWrite, WebFetch |
+| **Threat Intel** | Threat Intelligence | Actor profiling, IoC ingestion, STIX export | Bash, Grep, Glob, FileRead, WebFetch |
+| **Report** | Documentation | Pentest reports, executive summaries, finding writeups | Bash, Grep, Glob, FileRead, FileWrite, FileEdit |
+| **Monitor** | Monitoring | Continuous asset monitoring and alerting | Bash, Grep, Glob, FileRead, WebFetch |
+| **Scribe** | Documentation | Session documentation and note-taking | Bash, Grep, Glob, FileRead, FileWrite, FileEdit |
+
+---
+
+## Tool Integration
+
+Every agent has access to a curated set of tools via the `AgentToolkit` system. During task execution, agents can make tool calls that are executed locally and fed back iteratively — enabling real data gathering, file analysis, and command execution.
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| **Bash** | Execute shell commands (nmap, dig, whois, semgrep, etc.) with configurable timeouts |
+| **Grep** | Search file contents using ripgrep regex patterns with glob/type filtering |
+| **Glob** | Find files by name pattern (e.g., `*.py`, `*.yaml`) |
+| **FileRead** | Read file contents with line numbers, offset, and limit |
+| **FileWrite** | Write or create files in the agent's workspace |
+| **FileEdit** | Find-and-replace text within files |
+| **WebFetch** | Fetch content from HTTP/HTTPS URLs (APIs, feeds, pages) |
+
+### Security Model
+
+- **Per-agent allowlists** — Each agent role only has access to the tools it needs (defined in `src/tools/tool_runtime.ts`)
+- **Workspace sandboxing** — All file operations are confined to the agent's assigned workspace directory
+- **Path traversal protection** — Resolved paths are checked against the workspace root before any filesystem operation
+- **Audit logging** — Every tool invocation is recorded with agent ID, parameters, result, and timestamp (capped at 10,000 entries)
+
+### How It Works
+
+1. Agent receives a task and calls `queryModelWithTools()`
+2. The AI model's system prompt includes descriptions of available tools
+3. When the model outputs a `<tool_call>` block, the runtime parses and executes it
+4. Tool results are fed back to the model for the next reasoning step
+5. This loop continues (up to 10 rounds) until the model produces a final answer
+6. All tool invocations are tracked in the result (`tools_used`, `tool_calls_count`)
 
 ---
 
@@ -443,7 +478,10 @@ Agent-v0/
 |   +-- security/           TypeScript bridges to Rust security layer
 |   +-- sessions/           Session & workspace management
 |   +-- skills/             Skill loading, execution & verification
+|   +-- tools/              Tool execution runtime & agent toolkit
+|   +-- web/                Web dashboard (HTML/CSS/JS + server)
 |   +-- types/              Shared type definitions
++-- tools/                  Extended tool framework (React/Ink terminal UI)
 +-- rust/                   Rust security infrastructure
 |   +-- cyplex-sandbox/     OS-level process sandboxing
 |   +-- cyplex-audit/       Hash-chained audit logging
