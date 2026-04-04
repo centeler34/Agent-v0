@@ -157,6 +157,8 @@ mod tests {
     use rand::rngs::OsRng;
     use rand::Rng;
 
+    const TEST_PASSWORD: &str = "test-pass";
+
     fn random_test_secret(len: usize) -> Vec<u8> {
         let mut buf = vec![0u8; len];
         OsRng.fill(&mut buf[..]);
@@ -165,7 +167,7 @@ mod tests {
 
     #[test]
     fn roundtrip_save_load() {
-        let (master_key, salt) = MasterKey::derive("test-pass").unwrap();
+        let (master_key, salt) = MasterKey::derive(TEST_PASSWORD).unwrap();
         let mut ks = KeyStore::new(salt);
         let api_key = random_test_secret(24);
         let db_pass = random_test_secret(16);
@@ -178,7 +180,7 @@ mod tests {
 
         ks.save(&path, &master_key).unwrap();
 
-        let master_key2 = MasterKey::derive_with_salt("test-pass", ks.salt()).unwrap();
+        let master_key2 = MasterKey::derive_with_salt(TEST_PASSWORD, ks.salt()).unwrap();
         let loaded = KeyStore::load(&path, &master_key2).unwrap();
 
         assert_eq!(loaded.get("api-key").unwrap().value, api_key);
