@@ -43,7 +43,8 @@ pub struct LogEntry {
 impl LogEntry {
     /// Compute the SHA-256 hash over every field **except** `entry_hash`.
     ///
-    /// The hash is returned as a lowercase hex string.
+    /// The hash is returned as a lowercase hex string. Falls back to hashing a
+    /// concatenation of field values if JSON serialization fails unexpectedly.
     pub fn compute_hash(&self) -> String {
         // Build a canonical representation that excludes entry_hash.
         let canonical = serde_json::json!({
@@ -60,8 +61,19 @@ impl LogEntry {
             "source_channel": self.source_channel,
         });
 
-        let serialized = serde_json::to_string(&canonical)
-            .expect("canonical JSON serialization must not fail");
+        let serialized = match serde_json::to_string(&canonical) {
+            Ok(s) => s,
+            Err(_) => {
+                // Fallback: concatenate fields directly for hashing.
+                format!(
+                    "{}:{}:{}:{}:{}:{}:{:?}:{:?}:{:?}:{:?}:{:?}",
+                    self.log_id, self.prev_hash, self.timestamp,
+                    self.session_id, self.agent_id, self.action_type,
+                    self.action_detail, self.permissions_checked,
+                    self.outcome, self.user_id, self.source_channel,
+                )
+            }
+        };
 
         let digest = Sha256::digest(serialized.as_bytes());
         hex::encode(digest)

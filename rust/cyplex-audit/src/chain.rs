@@ -1,6 +1,7 @@
 use crate::error::AuditError;
 use crate::log_entry::LogEntry;
 use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 
 /// Build the chain hash that links `entry` to its predecessor.
 ///
@@ -61,9 +62,10 @@ pub fn verify_chain(entries: &[LogEntry]) -> Result<bool, AuditError> {
 }
 
 /// Check whether a single entry's `entry_hash` matches its recomputed hash.
+/// Uses constant-time comparison to prevent timing side-channel attacks.
 pub fn verify_single(entry: &LogEntry) -> bool {
     let expected = build_chain_hash(&entry.prev_hash, entry);
-    expected == entry.entry_hash
+    expected.as_bytes().ct_eq(entry.entry_hash.as_bytes()).into()
 }
 
 fn hex_encode(bytes: &[u8]) -> String {

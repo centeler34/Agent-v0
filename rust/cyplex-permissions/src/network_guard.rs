@@ -61,9 +61,13 @@ pub fn matches_pattern(pattern: &str, host: &str) -> bool {
         return true;
     }
 
+    let host_lower = host.to_ascii_lowercase();
+
     if let Some(suffix) = pattern.strip_prefix("*.") {
         // Wildcard: host must end with `.suffix` (i.e. be a subdomain).
-        host.ends_with(&format!(".{suffix}")) || host == suffix
+        // Case-insensitive for domain names (RFC 4343).
+        let suffix_lower = suffix.to_ascii_lowercase();
+        host_lower.ends_with(&format!(".{suffix_lower}")) || host_lower == suffix_lower
     } else {
         // Exact match (case-insensitive for domain names).
         pattern.eq_ignore_ascii_case(host)
