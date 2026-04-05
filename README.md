@@ -191,7 +191,7 @@ curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-v0/main/scripts/in
 
 The installer automatically detects your OS and architecture:
 - **Linux** (x64/arm64) — Installs via apt/dnf/pacman + bubblewrap sandbox
-- **macOS** (Intel/Apple Silicon) — Installs via Homebrew + sandbox-exec (Sandbox.framework)
+- **macOS** (Apple Silicon only — M1/M2/M3/M4) — Installs via Homebrew + sandbox-exec (Sandbox.framework)
 
 It handles all dependencies (Node.js, Rust, Go, Python), clones the repo, builds all components, and installs `agent-v0` as a system-wide command.
 
@@ -260,7 +260,7 @@ agent-v0
 | **PID file** | `/tmp/agent-v0.pid` | `~/.agent-v0/agent-v0.pid` |
 | **Auto-start** | systemd user service | macOS LaunchAgent |
 | **File picker** | zenity | osascript (native dialog) |
-| **Binary paths** | `/usr/bin/`, `/usr/local/bin/` | `/opt/homebrew/bin/` (ARM), `/usr/local/bin/` (Intel) |
+| **Binary paths** | `/usr/bin/`, `/usr/local/bin/` | `/opt/homebrew/bin/` (Apple Silicon) |
 
 ---
 

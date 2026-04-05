@@ -11,7 +11,13 @@ echo "Detected: $OS $ARCH"
 
 case "$OS" in
     Linux)  PLATFORM="linux" ;;
-    Darwin) PLATFORM="macos" ;;
+    Darwin)
+        PLATFORM="macos"
+        if [ "$ARCH" != "arm64" ]; then
+            echo "[x] Agent v0 only supports Apple Silicon (M1/M2/M3/M4) Macs. Intel Macs are not supported."
+            exit 1
+        fi
+        ;;
     *)      echo "Unsupported OS: $OS"; exit 1 ;;
 esac
 

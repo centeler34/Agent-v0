@@ -63,8 +63,7 @@ agent-v0:
         execute.allowed_binaries:
           # Auto-detected at runtime based on platform.
           # Linux:  /usr/bin/python3, /usr/local/bin/node
-          # macOS:  /opt/homebrew/bin/python3, /opt/homebrew/bin/node (Apple Silicon)
-          #         /usr/local/bin/python3, /usr/local/bin/node (Intel)
+          # macOS (Apple Silicon): /opt/homebrew/bin/python3, /opt/homebrew/bin/node
           - "/usr/bin/python3"
           - "/usr/local/bin/node"
         network.allow: []

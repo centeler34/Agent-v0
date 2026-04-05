@@ -45,14 +45,19 @@ ARCH="$(uname -m)"
 
 case "$OS" in
     Linux)  PLATFORM="linux" ;;
-    Darwin) PLATFORM="macos" ;;
-    *)      fail "Unsupported operating system: $OS. Agent v0 supports Linux and macOS." ;;
+    Darwin)
+        PLATFORM="macos"
+        if [ "$ARCH" != "arm64" ]; then
+            fail "Agent v0 only supports Apple Silicon (M1/M2/M3/M4) Macs. Intel Macs are not supported."
+        fi
+        ;;
+    *)      fail "Unsupported operating system: $OS. Agent v0 supports Linux and macOS (Apple Silicon)." ;;
 esac
 
 case "$ARCH" in
     x86_64)  GOARCH="amd64" ;;
     aarch64) GOARCH="arm64" ;;
-    arm64)   GOARCH="arm64" ;;   # macOS Apple Silicon
+    arm64)   GOARCH="arm64" ;;
     *)       fail "Unsupported architecture: $ARCH" ;;
 esac
 
@@ -91,11 +96,7 @@ install_system_deps() {
             warn "Homebrew not found. Installing Homebrew first..."
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
             # Source Homebrew for the rest of this script
-            if [ "$ARCH" = "arm64" ]; then
-                eval "$(/opt/homebrew/bin/brew shellenv)"
-            else
-                eval "$(/usr/local/bin/brew shellenv)"
-            fi
+            eval "$(/opt/homebrew/bin/brew shellenv)"
         fi
         info "Installing system dependencies via Homebrew..."
         brew install git curl openssl 2>/dev/null || true
@@ -316,11 +317,9 @@ export NVM_DIR="$HOME/.nvm"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env" 2>/dev/null
 [ -d "/usr/local/go/bin" ] && export PATH="/usr/local/go/bin:$PATH"
 
-# macOS Homebrew paths
+# macOS Apple Silicon Homebrew path
 if [ "$(uname -s)" = "Darwin" ]; then
-    if [ -d "/opt/homebrew/bin" ]; then
-        export PATH="/opt/homebrew/bin:$PATH"
-    fi
+    export PATH="/opt/homebrew/bin:$PATH"
 fi
 
 exec node "$INSTALL_DIR/dist/cli/cli.js" "$@"

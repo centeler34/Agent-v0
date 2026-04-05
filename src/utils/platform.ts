@@ -20,14 +20,20 @@ export type Arch = 'x64' | 'arm64';
 /** The current operating system. Throws on unsupported platforms. */
 export function getPlatform(): Platform {
   const p = process.platform;
-  if (p === 'linux' || p === 'darwin') return p;
-  throw new Error(`Unsupported platform: ${p}. Agent v0 supports Linux and macOS.`);
+  if (p === 'linux' || p === 'darwin') {
+    // macOS is only supported on Apple Silicon (arm64)
+    if (p === 'darwin' && process.arch !== 'arm64') {
+      throw new Error('Agent v0 only supports Apple Silicon (M1/M2/M3/M4) Macs. Intel Macs are not supported.');
+    }
+    return p;
+  }
+  throw new Error(`Unsupported platform: ${p}. Agent v0 supports Linux and macOS (Apple Silicon).`);
 }
 
 export function getArch(): Arch {
   const a = process.arch;
   if (a === 'x64' || a === 'arm64') return a;
-  throw new Error(`Unsupported architecture: ${a}. Agent v0 supports x64 and arm64.`);
+  throw new Error(`Unsupported architecture: ${a}. Agent v0 supports x64 (Linux) and arm64.`);
 }
 
 export const PLATFORM = getPlatform();
@@ -97,11 +103,10 @@ export const SHELL = shellPath();
 
 // ── Binary Detection ──────────────────────────────────────────────────────
 
-/** Homebrew prefix — /opt/homebrew on Apple Silicon, /usr/local on Intel Mac. */
+/** Homebrew prefix — /opt/homebrew on Apple Silicon. */
 export function homebrewPrefix(): string | null {
   if (!IS_MACOS) return null;
-  if (ARCH === 'arm64' && fs.existsSync('/opt/homebrew')) return '/opt/homebrew';
-  if (fs.existsSync('/usr/local/Homebrew')) return '/usr/local';
+  if (fs.existsSync('/opt/homebrew')) return '/opt/homebrew';
   return null;
 }
 
@@ -137,10 +142,8 @@ export function defaultAllowedBinaries(): string[] {
   const bins: string[] = [];
   const candidates = IS_MACOS
     ? [
-        '/usr/local/bin/python3',
         '/opt/homebrew/bin/python3',
         '/usr/bin/python3',
-        '/usr/local/bin/node',
         '/opt/homebrew/bin/node',
       ]
     : [

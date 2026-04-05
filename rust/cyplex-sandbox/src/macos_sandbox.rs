@@ -128,17 +128,13 @@ pub fn generate_sandbox_profile(config: &MacSandboxConfig) -> String {
     // Homebrew paths (common on macOS)
     profile.push_str(
         r#"
-;; Homebrew (Intel and Apple Silicon)
+;; Homebrew (Apple Silicon)
 (allow file-read*
-  (subpath "/usr/local/Cellar")
-  (subpath "/usr/local/lib")
-  (subpath "/usr/local/bin")
   (subpath "/opt/homebrew/Cellar")
   (subpath "/opt/homebrew/lib")
   (subpath "/opt/homebrew/bin")
 )
 (allow file-read* file-execute
-  (subpath "/usr/local/bin")
   (subpath "/opt/homebrew/bin")
 )
 
