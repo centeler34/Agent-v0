@@ -191,7 +191,7 @@ curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-v0/main/scripts/in
 
 The installer automatically detects your OS and architecture:
 - **Linux** (x64/arm64) — Installs via apt/dnf/pacman + bubblewrap sandbox
-- **macOS** (Apple Silicon only — M1/M2/M3/M4) — Installs via Homebrew + sandbox-exec (Sandbox.framework)
+- **macOS** (Apple Silicon only — M1/M2/M3/M4/M5) — Installs via Homebrew + sandbox-exec (Sandbox.framework)
 
 It handles all dependencies (Node.js, Rust, Go, Python), clones the repo, builds all components, and installs `agent-v0` as a system-wide command.
 

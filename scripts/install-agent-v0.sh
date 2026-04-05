@@ -48,7 +48,7 @@ case "$OS" in
     Darwin)
         PLATFORM="macos"
         if [ "$ARCH" != "arm64" ]; then
-            fail "Agent v0 only supports Apple Silicon (M1/M2/M3/M4) Macs. Intel Macs are not supported."
+            fail "Agent v0 only supports Apple Silicon (M1/M2/M3/M4/M5) Macs. Intel Macs are not supported."
         fi
         ;;
     *)      fail "Unsupported operating system: $OS. Agent v0 supports Linux and macOS (Apple Silicon)." ;;

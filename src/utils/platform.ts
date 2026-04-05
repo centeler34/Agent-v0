@@ -23,7 +23,7 @@ export function getPlatform(): Platform {
   if (p === 'linux' || p === 'darwin') {
     // macOS is only supported on Apple Silicon (arm64)
     if (p === 'darwin' && process.arch !== 'arm64') {
-      throw new Error('Agent v0 only supports Apple Silicon (M1/M2/M3/M4) Macs. Intel Macs are not supported.');
+      throw new Error('Agent v0 only supports Apple Silicon (M1/M2/M3/M4/M5) Macs. Intel Macs are not supported.');
     }
     return p;
   }
