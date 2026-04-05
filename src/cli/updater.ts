@@ -1,21 +1,14 @@
 /**
  * Agent v0 — Self-Updater
  *
- * Downloads the latest release from GitHub, extracts it over the install
- * directory, rebuilds all components, and restarts the CLI.
- *
- * Strategy:
- *   1. Query GitHub API for the latest release tag + tarball URL.
- *   2. Compare with the local version (from package.json).
- *   3. Download the release tarball to a temp directory.
- *   4. Back up the current install, extract the new code in-place.
- *   5. Install deps, rebuild, restart.
- *
- * Falls back to `git pull` if the install directory is a git repo and
- * the GitHub API request fails (e.g. no network, rate-limited, etc.).
+ * Checks the GitHub releases for the latest version, compares it to the
+ * locally installed version, and if a newer release exists it downloads
+ * the release, diffs the files, copies only the ones that changed, and
+ * recompiles only the components that were affected.
  */
 
 import { execSync, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import https from 'node:https';
@@ -26,10 +19,10 @@ import os from 'node:os';
 const GITHUB_OWNER = 'centeler34';
 const GITHUB_REPO = 'Agent-v0';
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
-const TARBALL_API = (tag: string) =>
+const TARBALL_URL = (tag: string) =>
   `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/tarball/${tag}`;
 
-// ── ANSI helpers ─────────────────────────────────────────────────────────────
+// ── ANSI ─────────────────────────────────────────────────────────────────────
 
 const CYAN = '\x1b[36m';
 const GREEN = '\x1b[32m';
@@ -39,36 +32,30 @@ const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
 const NC = '\x1b[0m';
 
-function info(text: string): void {
-  console.log(`  ${CYAN}[*]${NC} ${text}`);
-}
-function success(text: string): void {
-  console.log(`  ${GREEN}[+]${NC} ${text}`);
-}
-function warn(text: string): void {
-  console.log(`  ${YELLOW}[!]${NC} ${text}`);
-}
-function error(text: string): void {
-  console.log(`  ${RED}[x]${NC} ${text}`);
-}
+const info    = (t: string) => console.log(`  ${CYAN}[*]${NC} ${t}`);
+const ok      = (t: string) => console.log(`  ${GREEN}[+]${NC} ${t}`);
+const warn    = (t: string) => console.log(`  ${YELLOW}[!]${NC} ${t}`);
+const fail    = (t: string) => console.log(`  ${RED}[x]${NC} ${t}`);
+const bullet  = (t: string) => console.log(`      ${DIM}${t}${NC}`);
 
-// ── Shell helpers ────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function run(cmd: string, cwd: string): string {
   return execSync(cmd, { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 }
 
-function hasCommand(cmd: string): boolean {
-  if (!/^[a-zA-Z0-9_-]+$/.test(cmd)) return false;
-  try {
-    execSync(`command -v -- ${cmd}`, { stdio: 'pipe', shell: '/bin/sh' });
-    return true;
-  } catch {
-    return false;
-  }
+function hasCmd(name: string): boolean {
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) return false;
+  try { execSync(`command -v -- ${name}`, { stdio: 'pipe', shell: '/bin/sh' }); return true; }
+  catch { return false; }
 }
 
-// ── Install directory resolution ─────────────────────────────────────────────
+function sha256(filePath: string): string {
+  const data = fs.readFileSync(filePath);
+  return createHash('sha256').update(data).digest('hex');
+}
+
+// ── Version ──────────────────────────────────────────────────────────────────
 
 function getInstallDir(): string {
   const scriptDir = path.dirname(new URL(import.meta.url).pathname);
@@ -79,475 +66,403 @@ function getInstallDir(): string {
   return repoRoot;
 }
 
-function getLocalVersion(installDir: string): string {
+function getLocalVersion(dir: string): string {
   try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(installDir, 'package.json'), 'utf-8'));
-    return pkg.version ?? '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
+    return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf-8')).version ?? '0.0.0';
+  } catch { return '0.0.0'; }
 }
 
-/**
- * Write the installed version into package.json so future update checks
- * compare against the actual installed release, not a stale value.
- */
-function stampVersion(installDir: string, version: string): void {
-  const pkgPath = path.join(installDir, 'package.json');
+function stampVersion(dir: string, version: string): void {
+  const p = path.join(dir, 'package.json');
   try {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-    if (pkg.version === version) return; // already correct
+    const pkg = JSON.parse(fs.readFileSync(p, 'utf-8'));
+    if (pkg.version === version) return;
     pkg.version = version;
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
-    info(`Version stamped: ${BOLD}v${version}${NC}`);
-  } catch {
-    warn('Could not stamp version into package.json');
-  }
+    fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+  } catch { /* best effort */ }
 }
 
-// ── GitHub API helpers ───────────────────────────────────────────────────────
+function stripV(tag: string): string { return tag.replace(/^v/i, ''); }
+
+function isNewer(remoteTag: string, localVer: string): boolean {
+  const r = stripV(remoteTag).split('.').map(Number);
+  const l = localVer.split('.').map(Number);
+  for (let i = 0; i < Math.max(r.length, l.length); i++) {
+    if ((r[i] ?? 0) > (l[i] ?? 0)) return true;
+    if ((r[i] ?? 0) < (l[i] ?? 0)) return false;
+  }
+  return false;
+}
+
+// ── GitHub API ───────────────────────────────────────────────────────────────
 
 interface GitHubRelease {
   tag_name: string;
   name: string;
   body: string;
-  tarball_url: string;
   published_at: string;
 }
 
-function httpsGet(url: string): Promise<{ statusCode: number; headers: Record<string, string | string[] | undefined>; body: string }> {
+function httpsGet(url: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'agent-v0-updater', Accept: 'application/vnd.github+json' } }, (res) => {
-      // Follow redirects (GitHub sends 302 for tarball downloads)
-      if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+    const req = https.get(url, {
+      headers: { 'User-Agent': 'agent-v0-updater', Accept: 'application/vnd.github+json' },
+    }, (res) => {
+      if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location)
         return httpsGet(res.headers.location).then(resolve, reject);
-      }
       const chunks: Buffer[] = [];
-      res.on('data', (chunk: Buffer) => chunks.push(chunk));
-      res.on('end', () => {
-        resolve({
-          statusCode: res.statusCode ?? 0,
-          headers: res.headers as Record<string, string | string[] | undefined>,
-          body: Buffer.concat(chunks).toString('utf-8'),
-        });
-      });
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString() }));
     });
     req.on('error', reject);
-    req.setTimeout(30_000, () => { req.destroy(); reject(new Error('Request timed out')); });
+    req.setTimeout(30_000, () => { req.destroy(); reject(new Error('timeout')); });
   });
 }
 
 function httpsDownload(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'agent-v0-updater', Accept: 'application/octet-stream' } }, (res) => {
-      if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+    const req = https.get(url, {
+      headers: { 'User-Agent': 'agent-v0-updater', Accept: 'application/octet-stream' },
+    }, (res) => {
+      if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location)
         return httpsDownload(res.headers.location, dest).then(resolve, reject);
-      }
-      if (res.statusCode !== 200) {
-        reject(new Error(`Download failed: HTTP ${res.statusCode}`));
-        return;
-      }
+      if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
       const file = fs.createWriteStream(dest);
       res.pipe(file);
       file.on('finish', () => { file.close(); resolve(); });
       file.on('error', reject);
     });
     req.on('error', reject);
-    req.setTimeout(120_000, () => { req.destroy(); reject(new Error('Download timed out')); });
+    req.setTimeout(120_000, () => { req.destroy(); reject(new Error('timeout')); });
   });
 }
 
 async function fetchLatestRelease(): Promise<GitHubRelease | null> {
   try {
     const res = await httpsGet(GITHUB_API);
-    if (res.statusCode !== 200) return null;
+    if (res.status !== 200) return null;
     return JSON.parse(res.body) as GitHubRelease;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-// ── Cleanup helper ───────────────────────────────────────────────────────────
+// ── File diffing ─────────────────────────────────────────────────────────────
 
-function preUpdateCleanup(installDir: string): void {
-  const artifactPaths = [
-    path.join(installDir, 'dist'),
-    path.join(installDir, 'go/net-probe/net-probe'),
-  ];
-  for (const target of artifactPaths) {
-    if (!fs.existsSync(target)) continue;
-    const stat = fs.statSync(target);
-    const items = stat.isDirectory() ? fs.readdirSync(target) : [target];
-    for (const item of items) {
-      const fpath = stat.isDirectory() ? path.join(target, item) : item;
-      if (fs.existsSync(fpath) && fs.statSync(fpath).isFile() && fs.statSync(fpath).size === 0) {
-        fs.unlinkSync(fpath);
-      }
+/** Dirs that should never be replaced from the release. */
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'target']);
+
+/** Walk a directory tree and return relative paths of all files. */
+function walkFiles(root: string, rel = ''): string[] {
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(path.join(root, rel), { withFileTypes: true })) {
+    const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+      results.push(...walkFiles(root, relPath));
+    } else {
+      results.push(relPath);
     }
   }
+  return results;
 }
 
-// ── Version comparison ───────────────────────────────────────────────────────
-
-function stripV(tag: string): string {
-  return tag.replace(/^v/i, '');
+interface DiffResult {
+  added: string[];    // files only in new release
+  changed: string[];  // files that exist in both but content differs
+  removed: string[];  // files only in current install (not in release)
 }
 
-function isNewer(remoteTag: string, localVersion: string): boolean {
-  const r = stripV(remoteTag).split('.').map(Number);
-  const l = localVersion.split('.').map(Number);
-  for (let i = 0; i < Math.max(r.length, l.length); i++) {
-    const rv = r[i] ?? 0;
-    const lv = l[i] ?? 0;
-    if (rv > lv) return true;
-    if (rv < lv) return false;
+function diffFiles(currentDir: string, newDir: string): DiffResult {
+  const currentFiles = new Set(walkFiles(currentDir));
+  const newFiles = new Set(walkFiles(newDir));
+
+  const added: string[] = [];
+  const changed: string[] = [];
+  const removed: string[] = [];
+
+  for (const f of newFiles) {
+    if (!currentFiles.has(f)) {
+      added.push(f);
+    } else {
+      const currentHash = sha256(path.join(currentDir, f));
+      const newHash = sha256(path.join(newDir, f));
+      if (currentHash !== newHash) changed.push(f);
+    }
   }
-  return false;
+
+  for (const f of currentFiles) {
+    if (!newFiles.has(f)) removed.push(f);
+  }
+
+  return { added, changed, removed };
 }
 
-// ── Rebuild pipeline ─────────────────────────────────────────────────────────
+// ── Figure out what needs rebuilding ─────────────────────────────────────────
 
-function rebuildComponents(installDir: string): void {
-  info('Rebuilding components...');
+interface RebuildPlan {
+  typescript: boolean;
+  rust: boolean;
+  go: boolean;
+  python: boolean;
+  npm: boolean;
+}
+
+function planRebuild(diff: DiffResult): RebuildPlan {
+  const all = [...diff.added, ...diff.changed];
+
+  return {
+    npm:        all.some(f => f === 'package.json' || f === 'package-lock.json'),
+    typescript: all.some(f => f.startsWith('src/') && f.endsWith('.ts')),
+    rust:       all.some(f => f.startsWith('rust/') || f === 'Cargo.toml' || f === 'Cargo.lock'),
+    go:         all.some(f => f.startsWith('go/')),
+    python:     all.some(f => f.startsWith('python/')),
+  };
+}
+
+// ── Apply changes ────────────────────────────────────────────────────────────
+
+function applyDiff(installDir: string, newDir: string, diff: DiffResult): void {
+  // Copy added + changed files
+  for (const f of [...diff.added, ...diff.changed]) {
+    const src = path.join(newDir, f);
+    const dest = path.join(installDir, f);
+    const destDir = path.dirname(dest);
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+    fs.copyFileSync(src, dest);
+  }
+
+  // Remove deleted files (but never remove config / user files)
+  const safeToRemove = diff.removed.filter(f =>
+    !f.startsWith('.') &&
+    !f.includes('.env') &&
+    !f.includes('keystore') &&
+    !f.includes('session.token')
+  );
+  for (const f of safeToRemove) {
+    const target = path.join(installDir, f);
+    if (fs.existsSync(target)) fs.unlinkSync(target);
+  }
+}
+
+// ── Selective rebuild ────────────────────────────────────────────────────────
+
+function rebuild(installDir: string, plan: RebuildPlan): void {
+  info('Rebuilding changed components...');
   console.log('');
 
-  // ── Node.js / TypeScript ──
-  info('  Installing npm dependencies...');
-  try {
-    run('npm install', installDir);
-    success('  npm dependencies installed');
-  } catch {
-    error('  npm install failed');
-  }
-
-  try {
-    run('npm audit fix', installDir);
-    success('  npm audit vulnerabilities patched');
-  } catch {
-    // non-critical
-  }
-
-  info('  Compiling TypeScript...');
-  try {
-    run('npx tsc', installDir);
-    success('  TypeScript compiled');
-  } catch {
-    error('  TypeScript build failed');
-  }
-
-  // ── Rust ──
-  if (hasCommand('cargo')) {
-    info('  Updating & building Rust crates...');
+  if (plan.npm) {
+    info('  Installing npm dependencies...');
     try {
-      run('cargo update', installDir);
-      run('cargo build --release', installDir);
-      success('  Rust crates built');
-    } catch {
-      warn('  Rust build skipped');
-    }
+      run('npm install', installDir);
+      try { run('npm audit fix', installDir); } catch { /* non-critical */ }
+      ok('  npm dependencies updated');
+    } catch { fail('  npm install failed'); }
   }
 
-  // ── Go ──
-  if (hasCommand('go')) {
-    info('  Updating & building Go utilities...');
+  if (plan.typescript) {
+    info('  Compiling TypeScript...');
+    try {
+      // npm install first if we haven't already (types may have changed)
+      if (!plan.npm) {
+        try { run('npm install', installDir); } catch { /* best effort */ }
+      }
+      run('npx tsc', installDir);
+      ok('  TypeScript compiled');
+    } catch { fail('  TypeScript build failed'); }
+  }
+
+  if (plan.rust && hasCmd('cargo')) {
+    info('  Building Rust crates...');
+    try {
+      run('cargo build --release', installDir);
+      ok('  Rust crates built');
+    } catch { warn('  Rust build skipped'); }
+  }
+
+  if (plan.go && hasCmd('go')) {
+    info('  Building Go utilities...');
     try {
       const goDir = path.join(installDir, 'go', 'net-probe');
       if (fs.existsSync(goDir)) {
-        run('go get -u ./...', goDir);
-        run('go mod tidy', goDir);
         const goDistDir = path.join(installDir, 'dist', 'go');
         if (!fs.existsSync(goDistDir)) fs.mkdirSync(goDistDir, { recursive: true });
         run('go build -o ../../dist/go/net-probe .', goDir);
-        success('  Go utilities built');
+        ok('  Go utilities built');
       }
-    } catch {
-      warn('  Go build skipped');
-    }
+    } catch { warn('  Go build skipped'); }
   }
 
-  // ── Python ──
-  if (hasCommand('pip')) {
+  if (plan.python && hasCmd('pip')) {
     info('  Updating Python dependencies...');
     try {
-      const forensicsReq = path.join(installDir, 'python/forensics-service/requirements.txt');
-      const osintReq = path.join(installDir, 'python/osint-utils/requirements.txt');
-      if (fs.existsSync(forensicsReq)) run(`pip install --upgrade -r ${forensicsReq} -q`, installDir);
-      if (fs.existsSync(osintReq)) run(`pip install --upgrade -r ${osintReq} -q`, installDir);
-      success('  Python dependencies updated');
-    } catch {
-      warn('  Python deps update skipped');
-    }
+      const f1 = path.join(installDir, 'python/forensics-service/requirements.txt');
+      const f2 = path.join(installDir, 'python/osint-utils/requirements.txt');
+      if (fs.existsSync(f1)) run(`pip install --upgrade -r "${f1}" -q`, installDir);
+      if (fs.existsSync(f2)) run(`pip install --upgrade -r "${f2}" -q`, installDir);
+      ok('  Python dependencies updated');
+    } catch { warn('  Python deps update skipped'); }
+  }
+
+  if (!plan.npm && !plan.typescript && !plan.rust && !plan.go && !plan.python) {
+    ok('  No components need recompilation (config/docs only change)');
   }
 }
 
-// ── Restart ──────────────────────────────────────────────────────────────────
-
-function restartCli(installDir: string): void {
-  info('Restarting Agent v0...');
-  console.log('');
-
-  const entryPoint = path.join(installDir, 'dist', 'cli', 'cli.js');
-  const child = spawn('node', [entryPoint, ...process.argv.slice(2).filter(a => a !== 'update' && a !== '/update')], {
-    cwd: installDir,
-    stdio: 'inherit',
-    detached: false,
-    env: process.env,
-  });
-
-  child.on('exit', (code) => {
-    process.exit(code ?? 0);
-  });
-}
-
-// ── GitHub release download strategy ─────────────────────────────────────────
-
-async function updateViaGitHubRelease(installDir: string, release: GitHubRelease): Promise<boolean> {
-  const tag = release.tag_name;
-  const tmpDir = path.join(os.tmpdir(), `agent-v0-update-${Date.now()}`);
-  const tarballPath = path.join(tmpDir, 'release.tar.gz');
-  const extractDir = path.join(tmpDir, 'extracted');
-
-  try {
-    fs.mkdirSync(tmpDir, { recursive: true });
-    fs.mkdirSync(extractDir, { recursive: true });
-
-    // Download tarball
-    info(`Downloading ${BOLD}${tag}${NC} from GitHub...`);
-    const tarballUrl = TARBALL_API(tag);
-    await httpsDownload(tarballUrl, tarballPath);
-
-    const sizeKB = Math.round(fs.statSync(tarballPath).size / 1024);
-    success(`Downloaded ${sizeKB} KB`);
-
-    // Extract tarball
-    info('Extracting release...');
-    run(`tar xzf "${tarballPath}" -C "${extractDir}" --strip-components=1`, tmpDir);
-    success('Release extracted');
-
-    // Back up current install (keep .git, node_modules, .env, keystore, session)
-    info('Backing up current installation...');
-    const backupDir = path.join(tmpDir, 'backup');
-    fs.mkdirSync(backupDir, { recursive: true });
-
-    // Save items we want to preserve
-    const preserve = ['.git', 'node_modules', '.env', 'dist'];
-    for (const item of preserve) {
-      const src = path.join(installDir, item);
-      if (fs.existsSync(src)) {
-        const dest = path.join(backupDir, item);
-        // Use cp -a for symlinks & permissions
-        try { run(`cp -a "${src}" "${dest}"`, installDir); } catch { /* best effort */ }
-      }
-    }
-
-    // Copy new release files over the install directory
-    info('Installing new version...');
-
-    // Get list of files/dirs from the extracted release
-    const releaseItems = fs.readdirSync(extractDir);
-    for (const item of releaseItems) {
-      // Don't overwrite preserved directories with release versions
-      if (preserve.includes(item) && item !== '.env') continue;
-
-      const src = path.join(extractDir, item);
-      const dest = path.join(installDir, item);
-
-      // Remove old version of the item
-      if (fs.existsSync(dest)) {
-        const stat = fs.statSync(dest);
-        if (stat.isDirectory()) {
-          run(`rm -rf "${dest}"`, installDir);
-        } else {
-          fs.unlinkSync(dest);
-        }
-      }
-
-      // Copy new version in
-      run(`cp -a "${src}" "${dest}"`, installDir);
-    }
-
-    // Restore preserved items that might have been removed
-    for (const item of preserve) {
-      const backed = path.join(backupDir, item);
-      const dest = path.join(installDir, item);
-      if (fs.existsSync(backed) && !fs.existsSync(dest)) {
-        run(`cp -a "${backed}" "${dest}"`, installDir);
-      }
-    }
-
-    success(`Installed ${BOLD}${tag}${NC}`);
-
-    // Stamp the installed version into package.json so future update
-    // checks know exactly which release is installed locally.
-    stampVersion(installDir, stripV(tag));
-
-    // Update the local git reference if this is a git repo
-    if (fs.existsSync(path.join(installDir, '.git'))) {
-      try {
-        run('git fetch origin --tags', installDir);
-        run(`git reset --hard ${tag}`, installDir);
-      } catch {
-        // Non-critical — the files are already updated
-      }
-    }
-
-    // Cleanup temp directory
-    try { run(`rm -rf "${tmpDir}"`, os.tmpdir()); } catch { /* best effort */ }
-
-    return true;
-  } catch (err) {
-    error(`GitHub release download failed: ${err instanceof Error ? err.message : String(err)}`);
-    // Cleanup on failure
-    try { run(`rm -rf "${tmpDir}"`, os.tmpdir()); } catch { /* best effort */ }
-    return false;
-  }
-}
-
-// ── Git pull fallback strategy ───────────────────────────────────────────────
-
-function updateViaGitPull(installDir: string): boolean {
-  warn('Falling back to git pull...');
-
-  if (!fs.existsSync(path.join(installDir, '.git'))) {
-    error('No git repository found. Cannot update.');
-    return false;
-  }
-
-  try {
-    run('git fetch origin', installDir);
-  } catch {
-    error('Failed to fetch from remote. Check your network connection.');
-    return false;
-  }
-
-  const localHash = run('git rev-parse HEAD', installDir);
-  let remoteHash: string;
-  try {
-    remoteHash = run('git rev-parse origin/main', installDir);
-  } catch {
-    try {
-      remoteHash = run('git rev-parse origin/master', installDir);
-    } catch {
-      error('Cannot determine remote branch.');
-      return false;
-    }
-  }
-
-  if (localHash === remoteHash) {
-    success('Already up to date!');
-    return false; // nothing to rebuild
-  }
-
-  try {
-    // Stash local changes
-    try {
-      const status = run('git status --porcelain', installDir);
-      if (status) {
-        warn('Stashing local changes...');
-        run('git stash', installDir);
-      }
-    } catch { /* no changes */ }
-
-    run('git pull origin main --ff-only', installDir);
-    const pulledVersion = getLocalVersion(installDir);
-    success(`Code updated via git → v${pulledVersion}`);
-    return true;
-  } catch {
-    error('Git pull failed. Resolve conflicts manually.');
-    return false;
-  }
-}
-
-// ── Main entry point ─────────────────────────────────────────────────────────
+// ── Main ─────────────────────────────────────────────────────────────────────
 
 export async function runUpdate(): Promise<void> {
   const installDir = getInstallDir();
-  preUpdateCleanup(installDir);
+  const localVersion = getLocalVersion(installDir);
 
+  // ── Header ──
   console.log('');
   console.log(`${CYAN}${'─'.repeat(60)}${NC}`);
   console.log(`${BOLD}  Agent v0 — Update${NC}`);
   console.log(`${CYAN}${'─'.repeat(60)}${NC}`);
   console.log('');
-
-  const localVersion = getLocalVersion(installDir);
-  info(`Install directory: ${DIM}${installDir}${NC}`);
-  info(`Current version:   ${BOLD}v${localVersion}${NC}`);
+  info(`Installed version: ${BOLD}v${localVersion}${NC}`);
+  info(`Install path:      ${DIM}${installDir}${NC}`);
   console.log('');
 
-  // ── Step 1: Check for updates via GitHub API ──────────────────────────────
+  // ── Step 1: Check GitHub for latest release ──
 
-  info('Checking GitHub for latest release...');
+  info('Checking for updates...');
+  console.log('');
 
   const release = await fetchLatestRelease();
-  let updated = false;
 
-  if (release) {
-    const remoteVersion = stripV(release.tag_name);
-    info(`Latest release:    ${BOLD}${release.tag_name}${NC}  ${DIM}(${release.published_at.split('T')[0]})${NC}`);
+  if (!release) {
+    fail('Could not reach GitHub. Check your internet connection.');
+    console.log('');
+    return;
+  }
 
-    if (release.name) {
-      info(`Release name:      ${DIM}${release.name}${NC}`);
-    }
+  const remoteVersion = stripV(release.tag_name);
+  info(`Latest version:    ${BOLD}v${remoteVersion}${NC}  ${DIM}(released ${release.published_at.split('T')[0]})${NC}`);
 
+  if (release.name) {
+    info(`Release:           ${DIM}${release.name}${NC}`);
+  }
+
+  console.log('');
+
+  // ── Step 2: Compare versions ──
+
+  if (!isNewer(release.tag_name, localVersion)) {
+    ok(`${BOLD}You are already running the latest version!${NC}`);
+    console.log('');
+    console.log(`  ${DIM}No download needed. Agent v0 v${localVersion} is up to date.${NC}`);
+    console.log('');
+    return;
+  }
+
+  // Show what's new
+  info(`${BOLD}New version available: v${localVersion} → v${remoteVersion}${NC}`);
+  console.log('');
+
+  if (release.body) {
+    info('Changelog:');
+    const lines = release.body.split('\n').filter(l => l.trim()).slice(0, 15);
+    for (const line of lines) bullet(line);
+    if (release.body.split('\n').filter(l => l.trim()).length > 15) bullet('...');
+    console.log('');
+  }
+
+  // ── Step 3: Download release ──
+
+  const tmpDir = path.join(os.tmpdir(), `agent-v0-update-${Date.now()}`);
+  const tarball = path.join(tmpDir, 'release.tar.gz');
+  const extractDir = path.join(tmpDir, 'release');
+
+  try {
+    fs.mkdirSync(extractDir, { recursive: true });
+
+    info(`Downloading v${remoteVersion} from GitHub...`);
+    await httpsDownload(TARBALL_URL(release.tag_name), tarball);
+
+    const sizeKB = Math.round(fs.statSync(tarball).size / 1024);
+    ok(`Downloaded (${sizeKB} KB)`);
+
+    // Extract
+    info('Extracting...');
+    run(`tar xzf "${tarball}" -C "${extractDir}" --strip-components=1`, tmpDir);
+    ok('Extracted');
     console.log('');
 
-    if (!isNewer(release.tag_name, localVersion)) {
-      success('Already on the latest version!');
+    // ── Step 4: Diff — find only the files that changed ──
+
+    info('Comparing files...');
+    const diff = diffFiles(installDir, extractDir);
+
+    const totalChanged = diff.added.length + diff.changed.length + diff.removed.length;
+
+    if (totalChanged === 0) {
+      ok('All files are identical — nothing to update.');
+      stampVersion(installDir, remoteVersion);
       console.log('');
       return;
     }
 
-    // Show release notes (first 10 lines)
-    if (release.body) {
-      info('What\'s new:');
-      const lines = release.body.split('\n').filter(l => l.trim()).slice(0, 12);
-      for (const line of lines) {
-        console.log(`    ${DIM}${line}${NC}`);
-      }
-      if (release.body.split('\n').filter(l => l.trim()).length > 12) {
-        console.log(`    ${DIM}...${NC}`);
-      }
+    // Show summary
+    if (diff.changed.length > 0) {
+      info(`${BOLD}${diff.changed.length}${NC} file(s) modified:`);
+      for (const f of diff.changed.slice(0, 20)) bullet(`~ ${f}`);
+      if (diff.changed.length > 20) bullet(`... and ${diff.changed.length - 20} more`);
+    }
+    if (diff.added.length > 0) {
+      info(`${BOLD}${diff.added.length}${NC} file(s) added:`);
+      for (const f of diff.added.slice(0, 10)) bullet(`+ ${f}`);
+      if (diff.added.length > 10) bullet(`... and ${diff.added.length - 10} more`);
+    }
+    if (diff.removed.length > 0) {
+      info(`${BOLD}${diff.removed.length}${NC} file(s) removed`);
+    }
+    console.log('');
+
+    // ── Step 5: Apply only changed files ──
+
+    info('Applying changes...');
+    applyDiff(installDir, extractDir, diff);
+    stampVersion(installDir, remoteVersion);
+    ok(`Updated to ${BOLD}v${remoteVersion}${NC} — ${totalChanged} file(s) changed`);
+    console.log('');
+
+    // ── Step 6: Rebuild only affected components ──
+
+    const plan = planRebuild(diff);
+    const rebuildList: string[] = [];
+    if (plan.npm) rebuildList.push('npm');
+    if (plan.typescript) rebuildList.push('TypeScript');
+    if (plan.rust) rebuildList.push('Rust');
+    if (plan.go) rebuildList.push('Go');
+    if (plan.python) rebuildList.push('Python');
+
+    if (rebuildList.length > 0) {
+      info(`Components to rebuild: ${BOLD}${rebuildList.join(', ')}${NC}`);
       console.log('');
     }
 
-    // ── Step 2: Download & install from GitHub release ──────────────────────
+    rebuild(installDir, plan);
 
-    info(`Updating ${BOLD}v${localVersion}${NC} → ${BOLD}${release.tag_name}${NC}`);
+    console.log('');
+    ok(`${BOLD}Update complete! Agent v0 v${remoteVersion} is ready.${NC}`);
     console.log('');
 
-    updated = await updateViaGitHubRelease(installDir, release);
+    // ── Step 7: Restart ──
 
-    if (!updated) {
-      // Fall back to git pull
-      console.log('');
-      updated = updateViaGitPull(installDir);
-    }
-  } else {
-    // No release info available — use git pull
-    warn('Could not reach GitHub API (rate-limited or offline).');
+    info('Restarting Agent v0...');
     console.log('');
-    updated = updateViaGitPull(installDir);
+
+    const entry = path.join(installDir, 'dist', 'cli', 'cli.js');
+    const args = process.argv.slice(2).filter(a => a !== 'update' && a !== '/update');
+    const child = spawn('node', [entry, ...args], {
+      cwd: installDir, stdio: 'inherit', detached: false, env: process.env,
+    });
+    child.on('exit', (code) => process.exit(code ?? 0));
+
+  } catch (err) {
+    fail(`Update failed: ${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    // Clean up temp files
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* best effort */ }
   }
-
-  if (!updated) {
-    console.log('');
-    error('Update was not applied.');
-    return;
-  }
-
-  console.log('');
-
-  // ── Step 3: Rebuild everything ────────────────────────────────────────────
-
-  rebuildComponents(installDir);
-
-  console.log('');
-  const newVersion = getLocalVersion(installDir);
-  success(`${BOLD}Update complete! Agent v0 v${newVersion} is ready.${NC}`);
-  console.log('');
-
-  // ── Step 4: Restart ───────────────────────────────────────────────────────
-
-  restartCli(installDir);
 }
