@@ -20,8 +20,9 @@ pub struct BubblewrapConfig {
 
 impl Default for BubblewrapConfig {
     fn default() -> Self {
-        Self { // Already correct from previous change
-            workspace_root: PathBuf::from("/tmp/agent-v0-workspace"),
+        let tmp = std::env::temp_dir();
+        Self {
+            workspace_root: tmp.join("agent-v0-workspace"),
             allowed_binaries: Vec::new(),
             network_access: false,
             readonly_paths: vec![

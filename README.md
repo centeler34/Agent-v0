@@ -32,7 +32,7 @@ Agent v0 is a powerful framework for deploying fleets of specialized AI agents. 
 - **CLI-first** — Full terminal interface with interactive REPL, no GUI required
 - **Multi-agent orchestration** — A central "Agentic" orchestrator decomposes tasks, delegates to specialized subordinate agents, and synthesizes results
 - **Model-agnostic** — Route tasks to Anthropic Claude, OpenAI GPT, or Google Gemini
-- **OS-level sandboxing** — Agents are confined to assigned workspaces using Linux namespaces, seccomp, and Bubblewrap
+- **OS-level sandboxing** — Agents are confined to assigned workspaces using bubblewrap (Linux) or sandbox-exec (macOS)
 - **Hash-chained audit logs** — Tamper-evident, append-only SHA-256 chained audit trail for every agent action
 - **Encrypted keystore** — API keys and secrets encrypted at rest with Argon2id key derivation
 - **Permission enforcement** — Fine-grained per-agent policies for filesystem, network, API access, and inter-agent messaging
@@ -119,10 +119,11 @@ Agent v0 implements defense-in-depth security across multiple layers. The core s
 ### Rust Security Layer
 
 #### Sandbox Isolation (`rust/cyplex-sandbox`)
-- **Linux Namespaces** — Each agent runs in isolated PID, mount, network, and user namespaces
-- **Bubblewrap Integration** — Lightweight containerization without requiring root
-- **Seccomp Filtering** — Restricts syscalls to a minimal allowlist per agent role
-- **Path Guards** — Filesystem access confined to the agent's workspace; all traversal attempts blocked
+- **Linux: Bubblewrap** — Each agent runs in isolated PID, mount, network, and user namespaces via `bwrap`
+- **macOS: Sandbox.framework** — Each agent runs in an Apple sandbox profile via `sandbox-exec` with deny-by-default policy
+- **Seccomp Filtering** (Linux) — Restricts syscalls to a minimal allowlist per agent role
+- **Path Guards** (all platforms) — Filesystem access confined to the agent's workspace; all traversal attempts blocked
+- **Auto-detection** — The runtime selects the best available sandbox backend automatically
 
 #### Audit Trail (`rust/cyplex-audit`)
 - **SHA-256 Hash Chain** — Each log entry includes the hash of the previous entry, creating a tamper-evident chain
@@ -182,23 +183,50 @@ Agent v0 implements defense-in-depth security across multiple layers. The core s
 
 ## Installation
 
-### Quick Install (Linux)
+### Quick Install (Linux + macOS)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-v0/main/scripts/install-agent-v0.sh | bash
 ```
 
-This will install all dependencies (Node.js, Rust, Go, Python), clone the repo, build all components, and install `agent-v0` as a system-wide command.
+The installer automatically detects your OS and architecture:
+- **Linux** (x64/arm64) — Installs via apt/dnf/pacman + bubblewrap sandbox
+- **macOS** (Apple Silicon only — M1/M2/M3/M4) — Installs via Homebrew + sandbox-exec (Sandbox.framework)
+
+It handles all dependencies (Node.js, Rust, Go, Python), clones the repo, builds all components, and installs `agent-v0` as a system-wide command.
+
+### macOS Quick Start
+
+If you already have Homebrew:
+
+```bash
+# Install prerequisites
+brew install node rust go python openssl
+
+# Clone and build
+git clone https://github.com/centeler34/Agent-v0.git ~/.agent-v0
+cd ~/.agent-v0
+npm install && npx tsc
+cargo build --release
+cd go/net-probe && go build -o ../../dist/go/net-probe . && cd ../..
+
+# Install command
+npm link
+agent-v0
+```
 
 ### Manual Install
 
 #### Prerequisites
 
-- **Node.js** >= 20.0.0
-- **Rust** (latest stable via rustup)
-- **Go** >= 1.23
-- **Python** >= 3.11
-- **Linux** with kernel >= 5.10 (for namespace/seccomp support)
+| Requirement | Linux | macOS |
+|---|---|---|
+| **Node.js** >= 20 | nvm or system package | `brew install node` |
+| **Rust** (stable) | rustup.rs | rustup.rs or `brew install rust` |
+| **Go** >= 1.23 | System package or go.dev | `brew install go` |
+| **Python** >= 3.11 | System package | `brew install python` (or built-in) |
+| **Sandbox** | bubblewrap (`bwrap`) | Built-in (`sandbox-exec`) |
+| **OpenSSL** | System package | `brew install openssl` (or LibreSSL built-in) |
 
 #### Steps
 
@@ -213,7 +241,7 @@ pip install -r python/forensics-service/requirements.txt
 pip install -r python/osint-utils/requirements.txt
 npx tsc
 
-mkdir -p ~/.agent-v0/{logs,audit,workspaces,quarantine/{pending,approved,rejected}}
+mkdir -p ~/.agent-v0/{logs,audit,certs,workspaces,quarantine/{pending,approved,rejected}}
 npm link
 ```
 
@@ -222,6 +250,17 @@ After installation:
 ```bash
 agent-v0
 ```
+
+### Platform Differences
+
+| Feature | Linux | macOS |
+|---|---|---|
+| **Process sandbox** | bubblewrap (namespaces + seccomp) | sandbox-exec (Sandbox.framework) |
+| **Daemon socket** | `/tmp/agent-v0.sock` | `~/.agent-v0/agent-v0.sock` |
+| **PID file** | `/tmp/agent-v0.pid` | `~/.agent-v0/agent-v0.pid` |
+| **Auto-start** | systemd user service | macOS LaunchAgent |
+| **File picker** | zenity | osascript (native dialog) |
+| **Binary paths** | `/usr/bin/`, `/usr/local/bin/` | `/opt/homebrew/bin/` (Apple Silicon) |
 
 ---
 

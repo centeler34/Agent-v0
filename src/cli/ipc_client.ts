@@ -3,6 +3,7 @@
  */
 
 import net from 'node:net';
+import * as platform from '../utils/platform.js';
 
 interface IpcMessage {
   id: string;
@@ -10,7 +11,7 @@ interface IpcMessage {
   payload: Record<string, unknown>;
 }
 
-const DEFAULT_SOCKET = '/tmp/agent-v0.sock';
+const DEFAULT_SOCKET = platform.socketPath();
 
 export async function sendIpcMessage(
   message: IpcMessage,

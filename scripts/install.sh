@@ -9,6 +9,18 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 echo "Detected: $OS $ARCH"
 
+case "$OS" in
+    Linux)  PLATFORM="linux" ;;
+    Darwin)
+        PLATFORM="macos"
+        if [ "$ARCH" != "arm64" ]; then
+            echo "[x] Agent v0 only supports Apple Silicon (M1/M2/M3/M4) Macs. Intel Macs are not supported."
+            exit 1
+        fi
+        ;;
+    *)      echo "Unsupported OS: $OS"; exit 1 ;;
+esac
+
 # Check prerequisites
 check_cmd() {
     if ! command -v "$1" &>/dev/null; then
@@ -28,6 +40,7 @@ check_cmd npm || MISSING=1
 check_cmd cargo || MISSING=1
 check_cmd go || MISSING=1
 check_cmd python3 || MISSING=1
+check_cmd openssl || MISSING=1
 
 if [ "$MISSING" -eq 1 ]; then
     echo ""
@@ -36,6 +49,11 @@ if [ "$MISSING" -eq 1 ]; then
     echo "  Rust:     https://rustup.rs/"
     echo "  Go:       https://go.dev/dl/"
     echo "  Python:   https://www.python.org/"
+    if [ "$PLATFORM" = "macos" ]; then
+        echo ""
+        echo "  On macOS, install all via Homebrew:"
+        echo "    brew install node rust go python openssl"
+    fi
     exit 1
 fi
 
@@ -62,8 +80,14 @@ npx tsc
 
 echo ""
 echo "Creating config directory..."
-mkdir -p ~/.agent-v0/{logs,audit,workspaces,quarantine/{pending,approved,rejected}}
+mkdir -p ~/.agent-v0/{logs,audit,certs,workspaces,quarantine/{pending,approved,rejected}}
 
 echo ""
 echo "=== Installation complete ==="
+echo "Platform: $OS $ARCH"
+if [ "$PLATFORM" = "macos" ]; then
+    echo "Sandbox: sandbox-exec (Apple Sandbox.framework)"
+else
+    echo "Sandbox: bubblewrap (Linux namespaces + seccomp)"
+fi
 echo "Run 'agent-v0 daemon start' to begin."

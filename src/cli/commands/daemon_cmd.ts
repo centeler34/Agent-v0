@@ -9,6 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import crypto from 'node:crypto'; // Added for crypto.randomUUID()
+import * as platform from '../../utils/platform.js';
+
 const CYAN = '\x1b[36m';
 const GREEN = '\x1b[32m';
 const YELLOW = '\x1b[33m';
@@ -17,7 +19,7 @@ const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
 const NC = '\x1b[0m';
 
-const PID_FILE = '/tmp/agent-v0.pid';
+const PID_FILE = platform.pidFilePath();
 
 function safeHomeDir(): string {
   const home = process.env.HOME;
@@ -53,7 +55,7 @@ export function registerDaemonCommands(program: Command): void {
   daemon
     .command('start')
     .description('Start the Agent v0 daemon in the background')
-    .option('--socket <path>', 'Unix socket path', '/tmp/agent-v0.sock')
+    .option('--socket <path>', 'Unix socket path', platform.socketPath())
     .option('--foreground', 'Run in foreground (don\'t daemonize)')
     .action(async (opts) => {
       // Check if already running

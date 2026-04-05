@@ -18,6 +18,7 @@ import os from 'node:os';
 import { TaskRegistry } from '../orchestrator/task_registry.js';
 import { MemoryManager } from '../orchestrator/memory_manager.js';
 import { KeystoreBridge } from '../security/keystore_bridge.js';
+import * as platform from '../utils/platform.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -39,7 +40,7 @@ app.use((_req, res, next) => {
 
 // ── TLS Setup ─────────────────────────────────────────────────────────────
 
-const certDir = path.join(os.homedir(), '.agent-v0', 'certs');
+const certDir = platform.CERT_DIR;
 const keyPath = path.join(certDir, 'server.key');
 const certPath = path.join(certDir, 'server.crt');
 
@@ -70,7 +71,7 @@ const httpsServer = createHttpsServer(tlsOptions, app);
 // ── Server Configuration ──────────────────────────────────────────────────
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
-const SOCKET_PATH = '/tmp/agent-v0.sock';
+const SOCKET_PATH = platform.socketPath();
 const ALLOWED_ORIGINS = [`https://localhost:${PORT}`, `https://127.0.0.1:${PORT}`];
 
 const io = new Server(httpsServer as any, {

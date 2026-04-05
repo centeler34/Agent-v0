@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Agent v0 — One-Line Installer for Linux
+# Agent v0 — Universal Installer (Linux + macOS)
 # Usage: curl -fsSL https://raw.githubusercontent.com/centeler34/Agent-v0/main/scripts/install-agent-v0.sh | bash
 # ============================================================================
 set -euo pipefail
@@ -16,7 +16,7 @@ INSTALL_DIR="$HOME/.agent-v0"
 BIN_LINK="/usr/local/bin/agent-v0"
 REPO_URL="https://github.com/centeler34/Agent-v0.git"
 NODE_MIN="20"
-GO_MIN="1.22"
+GO_MIN="1.23"
 PYTHON_MIN="3.11"
 
 banner() {
@@ -38,21 +38,48 @@ warn()    { echo -e "${YELLOW}[!]${NC} $1"; }
 fail()    { echo -e "${RED}[x]${NC} $1"; exit 1; }
 
 # --------------------------------------------------------------------------
-# Detect package manager
+# OS Detection
+# --------------------------------------------------------------------------
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+case "$OS" in
+    Linux)  PLATFORM="linux" ;;
+    Darwin)
+        PLATFORM="macos"
+        if [ "$ARCH" != "arm64" ]; then
+            fail "Agent v0 only supports Apple Silicon (M1/M2/M3/M4) Macs. Intel Macs are not supported."
+        fi
+        ;;
+    *)      fail "Unsupported operating system: $OS. Agent v0 supports Linux and macOS (Apple Silicon)." ;;
+esac
+
+case "$ARCH" in
+    x86_64)  GOARCH="amd64" ;;
+    aarch64) GOARCH="arm64" ;;
+    arm64)   GOARCH="arm64" ;;
+    *)       fail "Unsupported architecture: $ARCH" ;;
+esac
+
+# --------------------------------------------------------------------------
+# Package Manager Detection
 # --------------------------------------------------------------------------
 detect_pkg_manager() {
-    if command -v apt-get &>/dev/null; then
-        echo "apt"
-    elif command -v dnf &>/dev/null; then
-        echo "dnf"
-    elif command -v pacman &>/dev/null; then
-        echo "pacman"
-    elif command -v zypper &>/dev/null; then
-        echo "zypper"
-    elif command -v apk &>/dev/null; then
-        echo "apk"
-    else
-        echo "unknown"
+    if [ "$PLATFORM" = "macos" ]; then
+        if command -v brew &>/dev/null; then
+            echo "brew"
+        else
+            echo "unknown"
+        fi
+        return
+    fi
+    # Linux
+    if command -v apt-get &>/dev/null; then echo "apt"
+    elif command -v dnf &>/dev/null; then echo "dnf"
+    elif command -v pacman &>/dev/null; then echo "pacman"
+    elif command -v zypper &>/dev/null; then echo "zypper"
+    elif command -v apk &>/dev/null; then echo "apk"
+    else echo "unknown"
     fi
 }
 
@@ -62,29 +89,40 @@ detect_pkg_manager() {
 install_system_deps() {
     local pm
     pm=$(detect_pkg_manager)
-    info "Detected package manager: $pm"
+    info "Detected: $OS $ARCH (package manager: $pm)"
 
-    local pkgs="git curl build-essential"
+    if [ "$PLATFORM" = "macos" ]; then
+        if [ "$pm" = "unknown" ]; then
+            warn "Homebrew not found. Installing Homebrew first..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            # Source Homebrew for the rest of this script
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        fi
+        info "Installing system dependencies via Homebrew..."
+        brew install git curl openssl 2>/dev/null || true
+        return
+    fi
 
+    # Linux
     case "$pm" in
         apt)
             sudo apt-get update -qq
-            sudo apt-get install -y -qq git curl build-essential bubblewrap
+            sudo apt-get install -y -qq git curl build-essential bubblewrap openssl
             ;;
         dnf)
-            sudo dnf install -y git curl gcc gcc-c++ make bubblewrap
+            sudo dnf install -y git curl gcc gcc-c++ make bubblewrap openssl
             ;;
         pacman)
-            sudo pacman -Sy --noconfirm git curl base-devel bubblewrap
+            sudo pacman -Sy --noconfirm git curl base-devel bubblewrap openssl
             ;;
         zypper)
-            sudo zypper install -y git curl gcc gcc-c++ make bubblewrap
+            sudo zypper install -y git curl gcc gcc-c++ make bubblewrap openssl
             ;;
         apk)
-            sudo apk add git curl build-base bubblewrap
+            sudo apk add git curl build-base bubblewrap openssl
             ;;
         *)
-            warn "Unknown package manager. Please install git, curl, build tools, and bubblewrap manually."
+            warn "Unknown package manager. Please install git, curl, build tools, openssl, and bubblewrap (Linux) manually."
             ;;
     esac
 }
@@ -101,6 +139,13 @@ ensure_node() {
             return
         fi
         warn "Node.js $(node -v) is too old (need >= $NODE_MIN)"
+    fi
+
+    if [ "$PLATFORM" = "macos" ] && command -v brew &>/dev/null; then
+        info "Installing Node.js via Homebrew..."
+        brew install node
+        success "Node.js $(node -v) installed"
+        return
     fi
 
     info "Installing Node.js via nvm..."
@@ -137,26 +182,32 @@ ensure_rust() {
 ensure_go() {
     if command -v go &>/dev/null; then
         local ver
-        ver=$(go version | grep -oP '\d+\.\d+' | head -1)
+        ver=$(go version | grep -oE '[0-9]+\.[0-9]+' | head -1)
         success "Go $ver found"
         return
     fi
 
+    if [ "$PLATFORM" = "macos" ] && command -v brew &>/dev/null; then
+        info "Installing Go via Homebrew..."
+        brew install go
+        success "Go $(go version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') installed"
+        return
+    fi
+
+    # Linux: download binary
     info "Installing Go ${GO_MIN}..."
-    local arch
-    arch=$(uname -m)
-    case "$arch" in
-        x86_64)  arch="amd64" ;;
-        aarch64) arch="arm64" ;;
-        armv7l)  arch="armv6l" ;;
-    esac
-    curl -fsSL "https://go.dev/dl/go1.22.10.linux-${arch}.tar.gz" -o /tmp/go.tar.gz
+    local go_os="linux"
+    curl -fsSL "https://go.dev/dl/go${GO_MIN}.${go_os}-${GOARCH}.tar.gz" -o /tmp/go.tar.gz
     sudo rm -rf /usr/local/go
     sudo tar -C /usr/local -xzf /tmp/go.tar.gz
     rm /tmp/go.tar.gz
     export PATH="/usr/local/go/bin:$PATH"
-    echo 'export PATH="/usr/local/go/bin:$PATH"' >> "$HOME/.bashrc"
-    success "Go $(go version | grep -oP '\d+\.\d+\.\d+') installed"
+
+    # Add to shell profile
+    local profile="$HOME/.bashrc"
+    [ "$PLATFORM" = "macos" ] && profile="$HOME/.zshrc"
+    echo 'export PATH="/usr/local/go/bin:$PATH"' >> "$profile"
+    success "Go $(go version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') installed"
 }
 
 # --------------------------------------------------------------------------
@@ -170,6 +221,14 @@ ensure_python() {
         return
     fi
 
+    if [ "$PLATFORM" = "macos" ] && command -v brew &>/dev/null; then
+        info "Installing Python via Homebrew..."
+        brew install python
+        success "Python $(python3 --version | awk '{print $2}') installed"
+        return
+    fi
+
+    # Linux
     info "Installing Python..."
     local pm
     pm=$(detect_pkg_manager)
@@ -230,22 +289,21 @@ install_python_deps() {
 
 setup_config() {
     info "Setting up configuration directories..."
-    mkdir -p "$HOME/.agent-v0"/{logs,audit,workspaces,sessions}
+    mkdir -p "$HOME/.agent-v0"/{logs,audit,workspaces,sessions,certs}
     mkdir -p "$HOME/.agent-v0/quarantine"/{pending,approved,rejected}
 
     if [ ! -f "$HOME/.agent-v0/config.yaml" ]; then
         cp config/config.example.yaml "$HOME/.agent-v0/config.yaml"
         success "Default config created at ~/.agent-v0/config.yaml"
     else
-        warn "Config already exists at ~/.agent-v0/config.yaml — skipping"
+        warn "Config already exists at ~/.agent-v0/config.yaml -- skipping"
     fi
-
 }
 
 install_command() {
     info "Installing 'agent-v0' command..."
 
-    # Create wrapper script
+    # Create wrapper script (platform-aware)
     cat > "$INSTALL_DIR/agent-v0" << 'WRAPPER'
 #!/usr/bin/env bash
 INSTALL_DIR="$HOME/.agent-v0"
@@ -259,6 +317,11 @@ export NVM_DIR="$HOME/.nvm"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env" 2>/dev/null
 [ -d "/usr/local/go/bin" ] && export PATH="/usr/local/go/bin:$PATH"
 
+# macOS Apple Silicon Homebrew path
+if [ "$(uname -s)" = "Darwin" ]; then
+    export PATH="/opt/homebrew/bin:$PATH"
+fi
+
 exec node "$INSTALL_DIR/dist/cli/cli.js" "$@"
 WRAPPER
     chmod +x "$INSTALL_DIR/agent-v0"
@@ -271,12 +334,60 @@ WRAPPER
         # Fallback: add to user's local bin
         mkdir -p "$HOME/.local/bin"
         ln -sf "$INSTALL_DIR/agent-v0" "$HOME/.local/bin/agent-v0"
+
+        local profile="$HOME/.bashrc"
+        [ "$PLATFORM" = "macos" ] && profile="$HOME/.zshrc"
+
         if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-            warn "Added ~/.local/bin to PATH in ~/.bashrc — restart your shell or run: source ~/.bashrc"
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$profile"
+            warn "Added ~/.local/bin to PATH in $profile -- restart your shell or run: source $profile"
         fi
         success "'agent-v0' installed to ~/.local/bin/agent-v0"
     fi
+}
+
+# --------------------------------------------------------------------------
+# macOS LaunchAgent (optional daemon auto-start)
+# --------------------------------------------------------------------------
+setup_launchagent() {
+    if [ "$PLATFORM" != "macos" ]; then return; fi
+
+    local plist_dir="$HOME/Library/LaunchAgents"
+    local plist_path="$plist_dir/io.agent-v0.daemon.plist"
+
+    mkdir -p "$plist_dir"
+
+    cat > "$plist_path" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.agent-v0.daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$INSTALL_DIR/agent-v0</string>
+        <string>daemon</string>
+        <string>start</string>
+        <string>--foreground</string>
+    </array>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>$HOME/.agent-v0/logs/daemon.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>$HOME/.agent-v0/logs/daemon.stderr.log</string>
+    <key>WorkingDirectory</key>
+    <string>$INSTALL_DIR</string>
+</dict>
+</plist>
+PLIST
+
+    success "LaunchAgent installed at $plist_path"
+    info "  To auto-start daemon on login: launchctl load $plist_path"
+    info "  To start daemon now:           launchctl start io.agent-v0.daemon"
 }
 
 # --------------------------------------------------------------------------
@@ -285,16 +396,16 @@ WRAPPER
 main() {
     banner
 
-    info "Starting Agent v0 installation..."
+    info "Starting Agent v0 installation on ${BOLD}$OS $ARCH${NC}..."
     echo ""
 
     # Phase 1: System dependencies
-    info "=== Phase 1/6: System Dependencies ==="
+    info "=== Phase 1/7: System Dependencies ==="
     install_system_deps
     echo ""
 
     # Phase 2: Language runtimes
-    info "=== Phase 2/6: Language Runtimes ==="
+    info "=== Phase 2/7: Language Runtimes ==="
     ensure_node
     ensure_rust
     ensure_go
@@ -302,12 +413,12 @@ main() {
     echo ""
 
     # Phase 3: Clone repository
-    info "=== Phase 3/6: Clone Repository ==="
+    info "=== Phase 3/7: Clone Repository ==="
     clone_repo
     echo ""
 
     # Phase 4: Build everything
-    info "=== Phase 4/6: Build All Components ==="
+    info "=== Phase 4/7: Build All Components ==="
     build_typescript
     build_rust
     build_go
@@ -315,18 +426,30 @@ main() {
     echo ""
 
     # Phase 5: Configuration
-    info "=== Phase 5/6: Configuration ==="
+    info "=== Phase 5/7: Configuration ==="
     setup_config
     echo ""
 
     # Phase 6: Install command
-    info "=== Phase 6/6: Install Command ==="
+    info "=== Phase 6/7: Install Command ==="
     install_command
+    echo ""
+
+    # Phase 7: Platform-specific extras
+    info "=== Phase 7/7: Platform Setup ==="
+    setup_launchagent
     echo ""
 
     echo -e "${GREEN}${BOLD}============================================${NC}"
     echo -e "${GREEN}${BOLD}  Agent v0 installed successfully!${NC}"
     echo -e "${GREEN}${BOLD}============================================${NC}"
+    echo ""
+    echo -e "  Platform: ${BOLD}$OS $ARCH${NC}"
+    if [ "$PLATFORM" = "macos" ]; then
+        echo -e "  Sandbox:  ${BOLD}sandbox-exec (Apple Sandbox.framework)${NC}"
+    else
+        echo -e "  Sandbox:  ${BOLD}bubblewrap (Linux namespaces + seccomp)${NC}"
+    fi
     echo ""
     echo -e "  Run ${BOLD}agent-v0${NC} to launch the setup wizard and configure your API keys."
     echo ""

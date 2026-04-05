@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import readline from 'node:readline';
+import * as platform from '../utils/platform.js';
 
 const CYAN = '\x1b[36m';
 const GREEN = '\x1b[32m';
@@ -17,8 +18,8 @@ const DIM = '\x1b[2m';
 const NC = '\x1b[0m';
 
 const HOME = process.env.HOME || '~';
-const INSTALL_DIR = path.join(HOME, '.agent-v0');
-const CONFIG_DIR = path.join(HOME, '.agent-v0');
+const INSTALL_DIR = platform.DATA_DIR;
+const CONFIG_DIR = platform.DATA_DIR;
 const SYSTEM_BIN = '/usr/local/bin/agent-v0';
 const LOCAL_BIN = path.join(HOME, '.local', 'bin', 'agent-v0');
 
@@ -88,7 +89,7 @@ export async function runUninstall(): Promise<void> {
 
   // Stop daemon if running
   try {
-    const pidFile = '/tmp/agent-v0.pid';
+    const pidFile = platform.pidFilePath();
     if (fs.existsSync(pidFile)) {
       const pid = fs.readFileSync(pidFile, 'utf-8').trim();
       info(`Stopping daemon (PID ${pid})...`);
@@ -102,7 +103,7 @@ export async function runUninstall(): Promise<void> {
 
   // Remove socket
   try {
-    const sockPath = '/tmp/agent-v0.sock';
+    const sockPath = platform.socketPath();
     if (fs.existsSync(sockPath)) {
       fs.unlinkSync(sockPath);
       removed('Removed daemon socket');

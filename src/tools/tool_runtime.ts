@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AgentRole } from '../types/agent_config.js';
+import { SHELL } from '../utils/platform.js';
 
 // ── Tool Result ────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export function execBash(
   try {
     // Use execFileSync with explicit shell to avoid direct shell metachar interpretation
     // while still supporting pipes/redirects that agents legitimately need.
-    const stdout = execFileSync('/bin/sh', ['-c', command], {
+    const stdout = execFileSync(SHELL, ['-c', command], {
       cwd: opts.cwd,
       encoding: 'utf-8',
       timeout: opts.timeout_ms ?? 120_000,

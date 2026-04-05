@@ -18,6 +18,9 @@ pub enum SandboxError {
     #[error("bubblewrap execution failed: {0}")]
     BubblewrapFailed(String),
 
+    #[error("sandbox-exec (macOS) execution failed: {0}")]
+    SandboxExecFailed(String),
+
     #[error("unsupported platform: {0}")]
     UnsupportedPlatform(String),
 

@@ -13,13 +13,14 @@ import { randomUUID } from 'node:crypto';
 import { TaskRegistry } from '../../orchestrator/task_registry.js';
 import { KeystoreBridge } from '../../security/keystore_bridge.js';
 import os from 'node:os';
+import * as platform from '../../utils/platform.js';
 
 const app = express();
 app.disable('x-powered-by');
 app.disable('etag');
 app.set('trust proxy', false);
 
-const certDir = path.join(os.homedir(), '.agent-v0', 'certs');
+const certDir = platform.CERT_DIR;
 const keyPath = path.join(certDir, 'server.key');
 const certPath = path.join(certDir, 'server.crt');
 
@@ -47,7 +48,7 @@ const io = new Server(httpsServer, {
   cors: { origin: ALLOWED_ORIGINS, credentials: true },
 });
 const PORT = process.env.PORT || 3000;
-const SOCKET_PATH = '/tmp/agent-v0.sock';
+const SOCKET_PATH = platform.socketPath();
 
 const scriptDir = path.dirname(new URL(import.meta.url).pathname);
 app.use(express.static(path.resolve(scriptDir, '..', '..', 'web', 'public')));

@@ -10,9 +10,10 @@ import readline from 'node:readline';
 import crypto from 'node:crypto'; // Added for crypto.randomUUID()
 import { TaskRegistry } from '../orchestrator/task_registry.js';
 import { KeystoreBridge } from '../security/keystore_bridge.js';
+import * as platform from '../utils/platform.js';
 
 const HOME = process.env.HOME || process.env.USERPROFILE || '~';
-const AGENT_DIR = path.join(HOME, '.agent-v0');
+const AGENT_DIR = platform.DATA_DIR;
 const CONFIG_PATH = path.join(AGENT_DIR, 'config.yaml');
 const KEYSTORE_PATH = path.join(AGENT_DIR, 'keystore.enc');
 const SETUP_MARKER = path.join(AGENT_DIR, '.setup-complete');
@@ -361,7 +362,7 @@ async function stepDaemon(rl: readline.Interface): Promise<{ logLevel: string; s
   const logLevel = ['debug', 'info', 'warn', 'error'][logIdx];
   console.log('');
 
-  const socketPath = await ask(rl, 'Daemon socket path', '/tmp/agent-v0.sock');
+  const socketPath = await ask(rl, 'Daemon socket path', platform.socketPath());
   console.log('');
 
   return { logLevel, socketPath };
@@ -374,11 +375,11 @@ function generateConfig(cfg: SetupConfig): string {
   version: "1.0.0"
 
   daemon:
-    socket_path: "/tmp/agent-v0.sock"
-    pid_file: "/tmp/agent-v0.pid"
+    socket_path: "${platform.socketPath()}"
+    pid_file: "${platform.pidFilePath()}"
     heartbeat_interval_ms: 5000
     log_level: "${cfg.daemonLogLevel}"
-    log_path: "~/.agent-v0/logs/"
+    log_path: "${platform.LOG_DIR}/"
 
   sessions:
     default_workspace_root: "~/.agent-v0/workspaces/"
@@ -426,7 +427,7 @@ ${cfg.keys['google_ai_api_key'] ? `      gemini:
       workspace: "workspaces/code/"
       permissions:
         fs.execute: true
-        execute.allowed_binaries: ["/usr/bin/python3", "/usr/local/bin/node"]
+        execute.allowed_binaries: ${JSON.stringify(platform.defaultAllowedBinaries())}
         network.allow: []
     exploit_research:
       enabled: true

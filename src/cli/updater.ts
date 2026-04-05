@@ -13,6 +13,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import https from 'node:https';
 import os from 'node:os';
+import { SHELL } from '../utils/platform.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,12 +43,12 @@ const bullet  = (t: string) => console.log(`      ${DIM}${t}${NC}`);
 
 function run(cmd: string, cwd: string): string {
   // Use execFileSync with explicit shell to avoid command injection (CWE-78)
-  return execFileSync('/bin/sh', ['-c', cmd], { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  return execFileSync(SHELL, ['-c', cmd], { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 }
 
 function hasCmd(name: string): boolean {
   if (!/^[a-zA-Z0-9_-]+$/.test(name)) return false;
-  try { execFileSync('/bin/sh', ['-c', `command -v -- ${name}`], { stdio: 'pipe' }); return true; }
+  try { execFileSync(SHELL, ['-c', `command -v -- ${name}`], { stdio: 'pipe' }); return true; }
   catch { return false; }
 }
 
