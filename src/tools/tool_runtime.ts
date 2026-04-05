@@ -301,26 +301,18 @@ export async function execWebFetch(
     return { success: false, output: '', error: `Blocked scheme: ${parsed.protocol}`, duration_ms: Date.now() - start };
   }
 
-  // SSRF protection: block requests to private/internal networks (CWE-918)
+  // Block cloud metadata endpoints — these are the only real SSRF risk.
+  // Private/local IPs are intentionally allowed because Agent v0 runs
+  // locally and agents need to reach the daemon, local services, and
+  // network targets for security research.
   const hostname = parsed.hostname.toLowerCase();
-  const privatePatterns = [
-    /^localhost$/i,
-    /^127\.\d+\.\d+\.\d+$/,
-    /^10\.\d+\.\d+\.\d+$/,
-    /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
-    /^192\.168\.\d+\.\d+$/,
-    /^0\.0\.0\.0$/,
-    /^::1?$/,
-    /^fd[0-9a-f]{2}:/i,
-    /^fe80:/i,
-    /^169\.254\.\d+\.\d+$/,      // link-local
-    /\.local$/,
-    /\.internal$/,
-    /\.localhost$/,
-    /^metadata\.google\.internal$/,  // cloud metadata
+  const blockedHosts = [
+    /^metadata\.google\.internal$/,       // GCP metadata
+    /^169\.254\.169\.254$/,               // AWS/Azure/GCP metadata IP
+    /^metadata\.internal$/,
   ];
-  if (privatePatterns.some(p => p.test(hostname))) {
-    return { success: false, output: '', error: `SSRF blocked: request to private/internal host "${hostname}"`, duration_ms: Date.now() - start };
+  if (blockedHosts.some(p => p.test(hostname))) {
+    return { success: false, output: '', error: `Blocked: cloud metadata endpoint "${hostname}"`, duration_ms: Date.now() - start };
   }
 
   try {
